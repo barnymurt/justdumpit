@@ -459,3 +459,142 @@ def prune_transcript_failures(keep_days: int = 14) -> int:
     with connect() as conn:
         cur = conn.execute("DELETE FROM transcript_failures WHERE happened_at < ?", (cutoff,))
         return cur.rowcount
+
+
+# ---------------------------------------------------------------------------
+# Watch Later pipeline
+# ---------------------------------------------------------------------------
+
+
+def upsert_watch_later_entry(
+    video_id: str,
+    video_title: Optional[str] = None,
+    channel_name: Optional[str] = None,
+    video_url: Optional[str] = None,
+    added_to_watch_later_at: Optional[str] = None,
+) -> None:
+    """Record a video that we just discovered in the user's Watch Later."""
+    with connect() as conn:
+        existing = conn.execute(
+            "SELECT video_id, attempts FROM watch_later_processed WHERE video_id = ?",
+            (video_id,),
+        ).fetchone()
+        if existing is None:
+            conn.execute(
+                """
+                INSERT INTO watch_later_processed (
+                    video_id, video_title, channel_name, video_url,
+                    added_to_watch_later_at, discovered_at, attempts
+                ) VALUES (?, ?, ?, ?, ?, ?, 0)
+                """,
+                (
+                    video_id, video_title, channel_name, video_url,
+                    added_to_watch_later_at, now_iso(),
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE watch_later_processed SET
+                    video_title = COALESCE(?, video_title),
+                    channel_name = COALESCE(?, channel_name),
+                    video_url = COALESCE(?, video_url),
+                    added_to_watch_later_at = COALESCE(?, added_to_watch_later_at)
+                WHERE video_id = ?
+                """,
+                (video_title, channel_name, video_url, added_to_watch_later_at, video_id),
+            )
+
+
+def mark_watch_later_processed(video_id: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE watch_later_processed
+            SET processed_at = ?,
+                attempts = attempts + 1,
+                last_error = NULL
+            WHERE video_id = ?
+            """,
+            (now_iso(), video_id),
+        )
+
+
+def mark_watch_later_emailed(video_id: str, email_message_id: Optional[str]) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE watch_later_processed
+            SET emailed_at = ?, email_message_id = ?
+            WHERE video_id = ?
+            """,
+            (now_iso(), email_message_id, video_id),
+        )
+
+
+def mark_watch_later_failed(video_id: str, error: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE watch_later_processed
+            SET last_error = ?,
+                attempts = attempts + 1
+            WHERE video_id = ?
+            """,
+            ((error or "")[:500], video_id),
+        )
+
+
+def get_watch_later_entry(video_id: str) -> Optional[dict]:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM watch_later_processed WHERE video_id = ?",
+            (video_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def list_unprocessed_watch_later_entries() -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM watch_later_processed
+            WHERE processed_at IS NULL
+            ORDER BY discovered_at
+            """
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_watch_later_entries(limit: int = 100) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM watch_later_processed
+            ORDER BY discovered_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def watch_later_stats() -> dict:
+    with connect() as conn:
+        total = conn.execute("SELECT COUNT(*) AS n FROM watch_later_processed").fetchone()["n"]
+        processed = conn.execute(
+            "SELECT COUNT(*) AS n FROM watch_later_processed WHERE processed_at IS NOT NULL"
+        ).fetchone()["n"]
+        emailed = conn.execute(
+            "SELECT COUNT(*) AS n FROM watch_later_processed WHERE emailed_at IS NOT NULL"
+        ).fetchone()["n"]
+        last_processed = conn.execute(
+            "SELECT MAX(processed_at) AS t FROM watch_later_processed"
+        ).fetchone()["t"]
+    return {
+        "total": total,
+        "processed": processed,
+        "emailed": emailed,
+        "pending": total - processed,
+        "last_processed_at": last_processed,
+    }

@@ -24,6 +24,12 @@ venv/
 .env
 *.env.local
 
+# OAuth credentials and tokens
+credentials.json
+*_token.json
+*_credentials.json
+client_secret*.json
+
 # IDE
 .idea/
 .vscode/

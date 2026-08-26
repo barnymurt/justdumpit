@@ -14,6 +14,8 @@ For each video:
 
 For watched channels, RSS polling discovers new videos automatically every 6 hours (via systemd timer on the VM).
 
+**Watch Later pipeline:** OAuth-authenticate against your Google account once, and every time you save a YouTube video for later it gets fetched, analysed, and emailed to your Gmail so a downstream LLM agent can decide if it's useful for any of your other GitHub repos or sparks a new project idea. See `scripts/oauth-setup.md` for setup.
+
 ## Setup
 
 ```bash
@@ -26,6 +28,7 @@ Optional env vars (all read at runtime):
 - `MINIMAX_API_KEY` — required
 - `YTSCRAPER_DB_PATH` — defaults to `./kb.db`
 - `HF_HOME` / `SENTENCE_TRANSFORMERS_HOME` — embedding model cache
+- Watch Later / Gmail OAuth2: `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_ADDRESS`
 
 ## CLI
 
@@ -41,6 +44,13 @@ python -m src.cli videos # list ingested videos
 python -m src.cli db                     # KB stats
 python -m src.cli server --port 8765     # FastAPI + web UI
 python -m src.cli backup                 # snapshot KB to backups/
+
+# Watch Later pipeline
+python -m src.cli watch-later-auth       # OAuth: YouTube (browser)
+python -m src.cli gmail-auth             # OAuth: Gmail (browser)
+python -m src.cli watch-later-status     # show loop / auth / DB state
+python -m src.cli watch-later-sync       # one-shot poll + process + email
+python -m src.cli watch-later-list       # show entries we've recorded
 ```
 
 ## Web UI

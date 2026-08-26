@@ -478,6 +478,111 @@ def backup(
     typer.echo(f"Retained: {min(len(backups), keep)} backup(s)")
 
 
+# ---------------------------------------------------------------------------
+# Watch Later pipeline commands
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="watch-later-auth")
+def watch_later_auth_cmd(
+    headless: bool = typer.Option(
+        False,
+        "--headless",
+        help="Print auth URL and read code manually (for SSH/CI/no-browser envs)",
+    ),
+):
+    """Run OAuth2 for the YouTube Watch Later playlist (scope: youtube.readonly)."""
+    from src import youtube_watch_later
+    try:
+        path = youtube_watch_later.run_local_auth(headless=headless)
+    except Exception as e:
+        typer.echo(f"Auth failed: {e}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Saved YouTube token: {path}")
+    typer.echo("Verify with: python -m src.cli watch-later-status")
+
+
+@app.command(name="gmail-auth")
+def gmail_auth_cmd(
+    headless: bool = typer.Option(
+        False,
+        "--headless",
+        help="Print auth URL and read code manually (for SSH/CI/no-browser envs)",
+    ),
+):
+    """Run OAuth2 for Gmail sending (scope: gmail.send)."""
+    from src import gmail_sender
+    try:
+        path = gmail_sender.run_local_auth(headless=headless)
+    except Exception as e:
+        typer.echo(f"Auth failed: {e}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Saved Gmail token: {path}")
+    typer.echo("Verify with: python -m src.cli watch-later-status")
+
+
+@app.command(name="watch-later-sync")
+def watch_later_sync_cmd(
+    limit: int = typer.Option(25, "--limit", "-n", help="Max videos to process this run"),
+    model: str = typer.Option(DEFAULT_MODEL, "--model", "-m"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+):
+    """Run a single Watch Later poll + process + email pass and exit."""
+    _ensure_db()
+    try:
+        get_api_key()
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    from src.watch_later_loop import sync_once
+    report = sync_once(model=model, limit=limit)
+
+    if verbose or report.error:
+        import json as _json
+        typer.echo(_json.dumps(report.to_dict(), indent=2))
+    else:
+        typer.echo(
+            f"Watch Later: discovered={report.discovered} processed={report.processed} "
+            f"emailed={report.emailed} failed={report.failed}"
+        )
+    if report.error:
+        raise typer.Exit(2)
+
+
+@app.command(name="watch-later-status")
+def watch_later_status_cmd():
+    """Show Watch Later pipeline status (auth + loop + DB)."""
+    from src.watch_later_loop import get_status
+    import json as _json
+    status = get_status()
+    typer.echo(_json.dumps(status, indent=2))
+
+
+@app.command(name="watch-later-list")
+def watch_later_list_cmd(
+    limit: int = typer.Option(20, "--limit", "-n"),
+    only_pending: bool = typer.Option(False, "--pending"),
+):
+    """List Watch Later entries recorded by the pipeline."""
+    _ensure_db()
+    from src import db
+    rows = (
+        db.list_unprocessed_watch_later_entries()
+        if only_pending
+        else db.list_watch_later_entries(limit=limit)
+    )
+    if not rows:
+        typer.echo("No Watch Later entries.")
+        return
+    for r in rows:
+        marker = "OK " if r.get("emailed_at") else ("PEND" if not r.get("processed_at") else "FAIL")
+        title = (r.get("video_title") or "(no title)")[:60]
+        typer.echo(f"  [{marker}] {r['video_id']}  {title}")
+        if r.get("last_error"):
+            typer.echo(f"          error: {r['last_error'][:80]}")
+
+
 def _parse_video_selection(videos_str: Optional[str], max_videos: int) -> list[int]:
     if not videos_str:
         return []

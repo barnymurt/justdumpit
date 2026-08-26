@@ -129,6 +129,7 @@
     <div class="tab" data-tab="add">Add URL</div>
     <div class="tab" data-tab="videos">Videos</div>
     <div class="tab" data-tab="channels">Channels</div>
+    <div class="tab" data-tab="watch-later">Watch Later</div>
   </div>
 
   <section class="panel active" id="panel-search">
@@ -171,6 +172,21 @@
     <div id="addch-out"></div>
     <div id="channels-list" style="margin-top:12px"></div>
   </section>
+
+  <section class="panel" id="panel-watch-later">
+    <div id="wl-status" class="result" style="margin-top:0">
+      <div class="loading">Loading Watch Later status…</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="primary" id="wl-sync-now">Sync now</button>
+      <button class="ghost" id="wl-refresh">Refresh</button>
+    </div>
+    <div id="wl-sync-out"></div>
+    <h3 style="margin-top:18px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Pending</h3>
+    <div id="wl-pending"></div>
+    <h3 style="margin-top:18px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Recent</h3>
+    <div id="wl-recent"></div>
+  </section>
 </div>
 
 <script>
@@ -182,6 +198,7 @@ function showPanel(tabName) {
   panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabName));
   if (tabName === 'videos') loadVideos();
   if (tabName === 'channels') loadChannels();
+  if (tabName === 'watch-later') loadWatchLater();
 }
 
 tabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.tab)));
@@ -484,6 +501,99 @@ async function doAddChannel() {
 }
 document.getElementById('addchgo').addEventListener('click', doAddChannel);
 document.getElementById('addchurl').addEventListener('keydown', e => { if (e.key === 'Enter') doAddChannel(); });
+
+// ---------- Watch Later ----------
+
+async function loadWatchLater() {
+  const statusEl = document.getElementById('wl-status');
+  const pendingEl = document.getElementById('wl-pending');
+  const recentEl = document.getElementById('wl-recent');
+  statusEl.innerHTML = '<div class="loading">Loading Watch Later status…</div>';
+  pendingEl.innerHTML = '';
+  recentEl.innerHTML = '';
+  try {
+    const status = await jget('/watch-later/status');
+    const ytOk = status.youtube_authenticated;
+    const gmOk = status.gmail_authenticated;
+    const statusBanner = status.error
+      ? `<div class="banner error show"><b>Error:</b> ${escapeHtml(status.error)}</div>`
+      : '';
+    statusEl.innerHTML = `
+      <div class="title">Watch Later pipeline</div>
+      <div class="vch">
+        Loop: ${status.thread_alive ? '<b style="color:#7ed957">running</b>' : '<b style="color:#ff8a65">stopped</b>'}
+        · interval: ${Math.round(status.interval_seconds / 60)}m
+        · pending: ${status.stats.pending}
+        · processed: ${status.stats.processed}
+        · emailed: ${status.stats.emailed}
+      </div>
+      <div class="vch">
+        YouTube: ${ytOk ? '<b style="color:#7ed957">authenticated</b>' : '<b style="color:#ffb347">not authenticated</b>'}
+        · Gmail: ${gmOk ? '<b style="color:#7ed957">authenticated</b>' : '<b style="color:#ffb347">not authenticated</b>'}
+        ${status.gmail_address ? '· sender: ' + escapeHtml(status.gmail_address) : ''}
+      </div>
+      ${statusBanner}
+      <div class="vch" style="margin-top:4px">
+        Last processed: ${status.stats.last_processed_at || 'never'}
+      </div>
+    `;
+
+    const [pending, recent] = await Promise.all([
+      jget('/watch-later/entries?only_pending=true'),
+      jget('/watch-later/entries?limit=15'),
+    ]);
+    pendingEl.innerHTML = renderWlEntries(pending.entries || [], { empty: 'No pending videos.' });
+    recentEl.innerHTML = renderWlEntries(recent.entries || [], { empty: 'No recent activity.' });
+  } catch (e) {
+    statusEl.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderWlEntries(rows, { empty }) {
+  if (!rows.length) return `<div class="empty">${escapeHtml(empty)}</div>`;
+  return rows.map(r => {
+    const marker = r.emailed_at ? '✓' : (r.processed_at ? '!' : '·');
+    const color = r.emailed_at ? '#7ed957' : (r.processed_at ? '#ffb347' : 'var(--muted)');
+    const err = r.last_error ? `<div class="vch" style="color:#ff8a65">error: ${escapeHtml(r.last_error.slice(0, 100))}</div>` : '';
+    return `
+      <div class="video-row">
+        <div style="font-size:18px;color:${color};flex:0 0 18px">${marker}</div>
+        <div class="meta">
+          <a class="vtitle" href="${escapeHtml(r.video_url || '#')}" target="_blank" rel="noopener">${escapeHtml(r.video_title || r.video_id)}</a>
+          <div class="vch">${escapeHtml(r.channel_name || '')} ${r.discovered_at ? '· discovered ' + escapeHtml(r.discovered_at) : ''}</div>
+          ${err}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function doWatchLaterSync() {
+  const out = document.getElementById('wl-sync-out');
+  const btn = document.getElementById('wl-sync-now');
+  btn.disabled = true;
+  out.innerHTML = '<div class="loading">Syncing…</div>';
+  try {
+    const r = await fetch('/watch-later/sync?limit=10', { method: 'POST' });
+    if (!r.ok) {
+      const detail = await r.json().catch(() => ({}));
+      throw new Error(detail.detail || ('HTTP ' + r.status));
+    }
+    const data = await r.json();
+    out.innerHTML = `<div class="result" style="margin-top:8px">
+      <div class="title">Sync complete</div>
+      <div class="vch">discovered: ${data.discovered} · processed: ${data.processed} · emailed: ${data.emailed} · failed: ${data.failed}</div>
+      ${data.errors && data.errors.length ? '<div class="vch" style="color:#ff8a65">' + data.errors.map(escapeHtml).join('<br>') + '</div>' : ''}
+    </div>`;
+    loadWatchLater();
+  } catch (e) {
+    out.innerHTML = `<div class="err">Sync failed: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('wl-sync-now').addEventListener('click', doWatchLaterSync);
+document.getElementById('wl-refresh').addEventListener('click', loadWatchLater);
 
 loadStats();
 loadStatus();

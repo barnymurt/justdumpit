@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +33,11 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 def _startup() -> None:
     db.init_db()
     start_scheduler_loop()
+    try:
+        from src.watch_later_loop import start_watch_later_loop
+        start_watch_later_loop()
+    except Exception as e:
+        logging.getLogger("ytscraper").exception("Watch Later loop failed to start: %s", e)
 
 
 @app.get("/")
@@ -231,3 +237,49 @@ def list_videos_endpoint(limit: int = 50):
 @app.get("/favicon.ico")
 def favicon():
     return JSONResponse(status_code=204, content=None)
+
+
+# ---------------------------------------------------------------------------
+# Watch Later pipeline endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/watch-later/status")
+def watch_later_status_endpoint():
+    from src.watch_later_loop import get_status
+    try:
+        return get_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"status failed: {e}")
+
+
+@app.post("/watch-later/sync")
+def watch_later_sync_endpoint(
+    limit: int = 25,
+    model: Optional[str] = None,
+):
+    try:
+        get_api_key()
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    from src.watch_later_loop import sync_once
+    from src.config import DEFAULT_MODEL
+
+    report = sync_once(model=model or DEFAULT_MODEL, limit=limit)
+    if report.error:
+        raise HTTPException(status_code=500, detail=report.error)
+    return report.to_dict()
+
+
+@app.get("/watch-later/entries")
+def watch_later_entries_endpoint(
+    limit: int = 50,
+    only_pending: bool = False,
+):
+    rows = (
+        db.list_unprocessed_watch_later_entries()
+        if only_pending
+        else db.list_watch_later_entries(limit=limit)
+    )
+    return {"entries": rows}

@@ -102,3 +102,22 @@ CREATE INDEX IF NOT EXISTS idx_failures_happened
     ON transcript_failures(happened_at DESC);
 CREATE INDEX IF NOT EXISTS idx_failures_reason
     ON transcript_failures(reason);
+
+CREATE TABLE IF NOT EXISTS watch_later_processed (
+    video_id TEXT PRIMARY KEY,
+    video_title TEXT,
+    channel_name TEXT,
+    video_url TEXT,
+    added_to_watch_later_at TEXT,
+    discovered_at TEXT NOT NULL,
+    processed_at TEXT,
+    emailed_at TEXT,
+    email_message_id TEXT,
+    last_error TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_watch_later_processed_at
+    ON watch_later_processed(processed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_watch_later_emailed_at
+    ON watch_later_processed(emailed_at DESC);
