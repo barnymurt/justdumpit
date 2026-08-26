@@ -13,7 +13,7 @@ from src.config import get_data_dir
 log = logging.getLogger(__name__)
 
 
-YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube"
 
 WATCH_LATER_PLAYLIST_ID = "WL"
 
@@ -80,6 +80,7 @@ def run_local_auth(headless: bool = False) -> Path:
     flow = InstalledAppFlow.from_client_config(
         _client_config(),
         scopes=[YOUTUBE_READONLY_SCOPE],
+        autogenerate_code_verifier=True,
     )
 
     if headless:
@@ -140,7 +141,7 @@ def run_local_auth(headless: bool = False) -> Path:
             thread.start()
 
             auth_url, _ = flow.authorization_url(
-                prompt="consent", access_type="offline", include_granted_scopes="false"
+                prompt="select_account consent", access_type="offline", include_granted_scopes="false"
             )
             print("\nOpen this URL in ANY browser, sign in, and grant access:\n")
             print(auth_url, flush=True)

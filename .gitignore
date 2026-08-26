@@ -30,6 +30,12 @@ credentials.json
 *_credentials.json
 client_secret*.json
 
+# Local auth helpers (used during OAuth flow, never committed)
+run_yt_auth.bat
+run_gmail_auth.bat
+wl_*.log
+wl_*.err
+
 # IDE
 .idea/
 .vscode/
