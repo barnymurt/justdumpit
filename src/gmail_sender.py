@@ -81,15 +81,80 @@ def run_local_auth(headless: bool = False) -> Path:
     )
 
     if headless:
-        flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
-        auth_url, _ = flow.authorization_url(
-            prompt="consent", access_type="offline", include_granted_scopes="true"
-        )
-        print("\nOpen this URL in any browser, grant access, then paste the code below:\n")
-        print(auth_url)
-        print()
-        code = input("Authorization code: ").strip()
-        flow.fetch_token(code=code)
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        from urllib.parse import urlparse, parse_qs
+        import threading as _threading
+        import time as _time
+
+        code_file = os.getenv("OAUTH_CODE_FILE", "").strip()
+        pre_code: Optional[str] = None
+        if code_file and Path(code_file).exists():
+            try:
+                pre_code = Path(code_file).read_text(encoding="utf-8").strip() or None
+            except OSError:
+                pre_code = None
+
+        if pre_code:
+            print(f"[auth] Using code from {code_file}", flush=True)
+            flow.fetch_token(code=pre_code)
+        else:
+            port = int(os.getenv("OAUTH_LOCAL_PORT", "18099"))
+            flow.redirect_uri = f"http://127.0.0.1:{port}"
+
+            captured: dict[str, Optional[str]] = {"code": None, "error": None}
+            event = _threading.Event()
+
+            class _Handler(BaseHTTPRequestHandler):
+                def do_GET(self):  # noqa: N802
+                    parsed = urlparse(self.path)
+                    qs = parse_qs(parsed.query)
+                    if "code" in qs:
+                        captured["code"] = qs["code"][0]
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
+                        self.end_headers()
+                        self.wfile.write(
+                            b"<html><body><h2>Authorised. You can close this tab.</h2>"
+                            b"<p>Return to your terminal.</p></body></html>"
+                        )
+                    elif "error" in qs:
+                        captured["error"] = qs["error"][0]
+                        self.send_response(400)
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
+                        self.end_headers()
+                        self.wfile.write(
+                            f"<html><body><h2>Error: {captured['error']}</h2></body></html>".encode()
+                        )
+                    else:
+                        self.send_response(404)
+                        self.end_headers()
+                    event.set()
+
+                def log_message(self, fmt, *args):  # silence
+                    pass
+
+            server = HTTPServer(("127.0.0.1", port), _Handler)
+            thread = _threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            auth_url, _ = flow.authorization_url(
+                prompt="consent", access_type="offline", include_granted_scopes="false"
+            )
+            print("\nOpen this URL in ANY browser, sign in, and grant access:\n")
+            print(auth_url, flush=True)
+            print(f"\nListening on http://127.0.0.1:{port} for the callback...", flush=True)
+            print("(You'll see 'site not reachable' after clicking Allow - that's fine, the auth is already captured.)")
+
+            try:
+                event.wait(timeout=600)
+            finally:
+                server.shutdown()
+
+            if captured["error"]:
+                raise RuntimeError(f"OAuth error: {captured['error']}")
+            if not captured["code"]:
+                raise RuntimeError("Timed out waiting for OAuth callback (no code received)")
+            flow.fetch_token(code=captured["code"])
     else:
         flow.run_local_server(port=0, open_browser=True)
 
