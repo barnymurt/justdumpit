@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b0b0b">
+<title>YT Knowledge Base</title>
+<style>
+  :root {
+    --bg: #0b0b0b;
+    --card: #161616;
+    --card2: #1d1d1d;
+    --border: #2a2a2a;
+    --text: #e6e6e6;
+    --muted: #888;
+    --muted2: #555;
+    --accent: #ff5722;
+    --accent-soft: rgba(255, 87, 34, 0.15);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-top: 8px; }
+  header .dot { width: 10px; height: 10px; background: var(--accent); border-radius: 50%; flex: 0 0 auto; }
+  header h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  header .stats { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+  .tabs { display: flex; gap: 4px; background: var(--card); padding: 4px; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border); overflow-x: auto; }
+  .tab { flex: 1; padding: 10px 12px; text-align: center; border-radius: 8px; cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 500; transition: background .15s, color .15s; user-select: none; white-space: nowrap; }
+  .tab.active { background: var(--accent-soft); color: var(--text); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .searchbox { display: flex; gap: 8px; }
+  .searchbox input { flex: 1; padding: 12px 14px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 16px; outline: none; }
+  .searchbox input:focus { border-color: var(--accent); }
+  .searchbox button, button.primary { padding: 12px 18px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .searchbox button:active, button.primary:active { transform: scale(0.98); }
+  button.ghost { padding: 8px 12px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; }
+  button.ghost:hover { color: var(--text); border-color: var(--text); }
+
+  .result { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .result .head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .result .score { color: var(--accent); font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .result .vid { color: var(--muted); font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .result .title { font-weight: 600; font-size: 15px; color: var(--text); }
+  .result .text { color: #c2c2c2; font-size: 14px; margin-top: 6px; white-space: pre-wrap; }
+  .result a { color: var(--accent); text-decoration: none; }
+
+  .empty { color: var(--muted); text-align: center; padding: 32px 0; font-size: 14px; }
+  .loading { color: var(--muted); text-align: center; padding: 20px 0; font-size: 14px; }
+  .err { color: #ff6b6b; padding: 10px 0; font-size: 14px; }
+
+  .banner { display: none; margin-bottom: 14px; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; border: 1px solid; }
+  .banner.show { display: block; }
+  .banner.warn { background: rgba(255, 165, 0, 0.08); border-color: rgba(255, 165, 0, 0.4); color: #ffb347; }
+  .banner.error { background: rgba(255, 87, 34, 0.10); border-color: rgba(255, 87, 34, 0.5); color: #ff8a65; }
+  .banner b { color: inherit; }
+  .banner code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  .video-row { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; }
+  .video-row:hover { background: var(--card2); margin: 0 -8px; padding: 12px 8px; border-radius: 8px; border-bottom-color: transparent; }
+  .video-row:last-child { border-bottom: none; }
+  .video-row .meta { flex: 1; min-width: 0; }
+  .video-row .vtitle { font-size: 14px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .video-row .vch { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .video-row .arrow { color: var(--muted); font-size: 18px; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .field label { font-size: 13px; color: var(--muted); }
+  .field input { padding: 11px 14px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 15px; outline: none; }
+  .field input:focus { border-color: var(--accent); }
+
+  /* Detail view */
+  .detail-head { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; }
+  .detail-head .back { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; flex: 0 0 auto; }
+  .detail-head .back:hover { color: var(--text); }
+  .detail-head h2 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; flex: 1; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; font-size: 12px; }
+  .meta-row .chip { background: var(--card); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; color: var(--muted); }
+
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .section h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  .section p { margin: 0 0 8px; }
+  .section p:last-child { margin-bottom: 0; }
+  .section ul { margin: 0; padding-left: 20px; }
+  .section li { margin-bottom: 6px; }
+  .section li:last-child { margin-bottom: 0; }
+
+  .concept { margin-bottom: 10px; }
+  .concept:last-child { margin-bottom: 0; }
+  .concept .name { color: var(--accent); font-weight: 600; }
+  .concept .def { color: #c8c8c8; }
+  .concept .ts { color: var(--muted2); font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; margin-left: 6px; }
+
+  .takeaway-group { margin-bottom: 12px; }
+  .takeaway-group:last-child { margin-bottom: 0; }
+  .takeaway-group .cat { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+
+  details { margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 13px; user-select: none; }
+  details summary:hover { color: #ff7a4d; }
+  .markdown { background: #0d0d0d; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-top: 10px; white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: #d0d0d0; max-height: 480px; overflow: auto; }
+
+  .transcript-text { background: #0d0d0d; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-top: 10px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: #cfcfcf; max-height: 480px; overflow: auto; }
+  .ts-jump { color: var(--accent); font-weight: 600; font-family: ui-monospace, "SF Mono", Menlo, monospace; text-decoration: none; }
+  .ts-jump:hover { text-decoration: underline; }
+
+  .video-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .video-list-header .count { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="dot"></span>
+    <h1>YT Knowledge Base</h1>
+    <span class="stats" id="stats">—</span>
+  </header>
+
+  <div id="banner" class="banner"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="search">Search</div>
+    <div class="tab" data-tab="add">Add URL</div>
+    <div class="tab" data-tab="videos">Videos</div>
+    <div class="tab" data-tab="channels">Channels</div>
+  </div>
+
+  <section class="panel active" id="panel-search">
+    <div class="searchbox">
+      <input id="q" placeholder="Search transcripts..." autocomplete="off">
+      <button id="qgo">Go</button>
+    </div>
+    <div id="results"></div>
+  </section>
+
+  <section class="panel" id="panel-add">
+    <div class="field">
+      <label>YouTube URL or video ID</label>
+      <input id="addurl" placeholder="https://www.youtube.com/watch?v=...">
+    </div>
+    <button class="primary" id="addgo">Analyse</button>
+    <div id="addout"></div>
+  </section>
+
+  <section class="panel" id="panel-videos">
+    <div class="video-list-header">
+      <span class="count" id="videos-count"></span>
+      <button class="ghost" id="refresh-videos">Refresh</button>
+    </div>
+    <div id="videos-list"></div>
+  </section>
+
+  <section class="panel" id="panel-detail">
+    <div id="detail-content"></div>
+  </section>
+
+  <section class="panel" id="panel-channels">
+    <div class="field" style="margin-bottom:8px">
+      <label>Add a YouTube channel (@handle or full URL)</label>
+      <div style="display:flex;gap:8px">
+        <input id="addchurl" placeholder="https://www.youtube.com/@ChannelName">
+        <button class="primary" id="addchgo">Add</button>
+      </div>
+    </div>
+    <div id="addch-out"></div>
+    <div id="channels-list" style="margin-top:12px"></div>
+  </section>
+</div>
+
+<script>
+const tabs = document.querySelectorAll('.tab');
+const panels = document.querySelectorAll('.panel');
+
+function showPanel(tabName) {
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+  panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabName));
+  if (tabName === 'videos') loadVideos();
+  if (tabName === 'channels') loadChannels();
+}
+
+tabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.tab)));
+document.getElementById('refresh-videos').addEventListener('click', loadVideos);
+
+async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.statusText); return r.json(); }
+async function jpost(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+  const text = await r.text();
+  let data; try { data = JSON.parse(text); } catch { data = { detail: text }; }
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+}
+
+function fmtTs(seconds) {
+  if (seconds == null) return '';
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+async function loadStats() {
+  try {
+    const s = await jget('/stats');
+    document.getElementById('stats').textContent = `${s.videos} videos · ${s.analyses} analyses`;
+  } catch (e) { /* ignore */ }
+}
+
+async function loadStatus() {
+  const el = document.getElementById('banner');
+  try {
+    const s = await jget('/status');
+    const y = s.youtube || {};
+    if (y.recent_block_count_24h > 0) {
+      const when = y.last_blocked_at ? new Date(y.last_blocked_at).toLocaleString() : 'recently';
+      el.className = 'banner error show';
+      el.innerHTML = `<b>YouTube is blocking this server.</b> ` +
+        `Transcripts will fail until cookies are refreshed. ` +
+        `Last blocked: ${escapeHtml(when)} (${y.recent_block_count_24h} blocks in last 24h).<br>` +
+        `<span style="opacity:.8">Fix:</span> re-export <code>youtube_cookies.txt</code> from your browser and upload to ` +
+        `<code>${escapeHtml(y.cookies_path || '/data/youtube_cookies.txt')}</code>, then restart the app.`;
+    } else if (!y.cookies_loaded) {
+      el.className = 'banner warn show';
+      el.innerHTML = `<b>YouTube cookies not loaded.</b> ` +
+        `Most videos will fail until you upload a logged-in cookies file to ` +
+        `<code>/data/youtube_cookies.txt</code>.`;
+    } else {
+      el.className = 'banner';
+      el.innerHTML = '';
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function doSearch() {
+  const q = document.getElementById('q').value.trim();
+  if (!q) return;
+  const out = document.getElementById('results');
+  out.innerHTML = '<div class="loading">Searching…</div>';
+  try {
+    const data = await jpost('/search', { query: q, k: 15 });
+    if (!data.results.length) { out.innerHTML = '<div class="empty">No matches.</div>'; return; }
+    out.innerHTML = data.results.map(r => `
+      <div class="result" data-vid="${r.video_id}" style="cursor:pointer">
+        <div class="head">
+          <span class="score">${r.score.toFixed(3)}</span>
+          <span class="vid">${r.video_id} · c${r.chunk_index}</span>
+        </div>
+        <div class="text">${escapeHtml(r.text.slice(0, 600))}${r.text.length > 600 ? '…' : ''}</div>
+        <div><a href="https://www.youtube.com/watch?v=${r.video_id}" target="_blank" onclick="event.stopPropagation()">Watch on YouTube ↗</a></div>
+      </div>
+    `).join('');
+    out.querySelectorAll('.result').forEach(el => {
+      el.addEventListener('click', () => openVideo(el.dataset.vid));
+    });
+  } catch (e) { out.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div>`; }
+}
+document.getElementById('qgo').addEventListener('click', doSearch);
+document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+async function doAdd() {
+  const url = document.getElementById('addurl').value.trim();
+  if (!url) return;
+  const out = document.getElementById('addout');
+  out.innerHTML = '<div class="loading">Running pipeline… (30-60s)</div>';
+  try {
+    const r = await jpost('/analyse', { url });
+    out.innerHTML = `
+      <div class="result">
+        <div class="title">${escapeHtml(r.video_title)}</div>
+        <div class="text">${escapeHtml(r.tldr)}</div>
+        ${r.argument ? `<div class="text" style="margin-top:8px"><b>Argument:</b> ${escapeHtml(r.argument)}</div>` : ''}
+        <details><summary>Show full markdown</summary><div class="markdown">${escapeHtml(r.markdown || '')}</div></details>
+        <div style="margin-top:10px"><button class="ghost" data-vid="${r.video_id}">View in detail →</button></div>
+      </div>
+    `;
+    out.querySelector('button[data-vid]').addEventListener('click', e => openVideo(e.currentTarget.dataset.vid));
+    loadStats();
+  } catch (e) { out.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div>`; }
+}
+document.getElementById('addgo').addEventListener('click', doAdd);
+document.getElementById('addurl').addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+
+async function loadVideos() {
+  const out = document.getElementById('videos-list');
+  out.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const data = await jget('/videos?limit=100');
+    if (!data.videos.length) { out.innerHTML = '<div class="empty">No videos yet.</div>'; document.getElementById('videos-count').textContent = ''; return; }
+    document.getElementById('videos-count').textContent = `${data.videos.length} videos`;
+    out.innerHTML = data.videos.map(v => `
+      <div class="video-row" data-vid="${v.video_id}">
+        <div class="meta">
+          <div class="vtitle">${escapeHtml(v.title || '(no title)')}</div>
+          <div class="vch">${escapeHtml(v.channel_name || '')}${v.transcript_available ? ' · transcript ✓' : ''}${v.published_at ? ' · ' + v.published_at.slice(0,10) : ''}</div>
+        </div>
+        <span class="arrow">›</span>
+      </div>
+    `).join('');
+    out.querySelectorAll('.video-row').forEach(el => {
+      el.addEventListener('click', () => openVideo(el.dataset.vid));
+    });
+  } catch (e) { out.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div>`; }
+}
+
+async function openVideo(videoId) {
+  showPanel('detail');
+  const out = document.getElementById('detail-content');
+  out.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const [v, transcript] = await Promise.all([
+      jget(`/video/${videoId}`),
+      jget(`/video/${videoId}/transcript`).catch(() => null),
+    ]);
+
+    const video = v.video || {};
+    const analysis = v.analysis;
+    const out_struct = (analysis && analysis.output) || {};
+    const tldr = out_struct.tldr || analysis?.tldr || '';
+    const argument = out_struct.argument || '';
+    const concepts = out_struct.key_concepts || [];
+    const takeaways = out_struct.takeaways || [];
+    const claims = out_struct.claims_to_verify || [];
+    const glossary = out_struct.glossary || [];
+    const markdown = out_struct.markdown || analysis?.markdown || '';
+
+    const transcriptText = transcript ? transcript.text : '';
+    const transcriptSegs = transcript ? (transcript.segments || []) : [];
+
+    const segByTs = (ts) => {
+      if (!ts || !transcriptSegs.length) return null;
+      const target = parseFloat(ts);
+      let best = null, bestDiff = Infinity;
+      for (const s of transcriptSegs) {
+        const d = Math.abs((s.start || 0) - target);
+        if (d < bestDiff) { bestDiff = d; best = s; }
+      }
+      return best;
+    };
+
+    const conceptHtml = concepts.length ? concepts.map(c => `
+      <div class="concept">
+        <span class="name">${escapeHtml(c.name || '')}</span>
+        <span class="ts">${fmtTs(c.first_timestamp_seconds)}</span>
+        <div class="def">${escapeHtml(c.definition || '')}</div>
+      </div>
+    `).join('') : '<div class="muted">No concepts extracted.</div>';
+
+    const byCat = {};
+    takeaways.forEach(t => {
+      const cat = t.category || 'general';
+      byCat[cat] = byCat[cat] || [];
+      byCat[cat].push(t.text || '');
+    });
+    const takeawayHtml = Object.keys(byCat).length ? Object.entries(byCat).map(([cat, items]) => `
+      <div class="takeaway-group">
+        <div class="cat">${escapeHtml(cat)}</div>
+        <ul>${items.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>
+      </div>
+    `).join('') : '<div class="muted">No takeaways extracted.</div>';
+
+    const claimHtml = claims.length ? `<ul>${claims.map(c => {
+      const ts = fmtTs(c.timestamp_seconds);
+      const seg = segByTs(c.timestamp_seconds);
+      const link = seg ? `<a class="ts-jump" href="https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(seg.start)}s" target="_blank">${ts}</a>` : ts;
+      return `<li>${escapeHtml(c.text || '')} <span class="ts">(${link})</span></li>`;
+    }).join('')}</ul>` : '<div class="muted">No claims flagged.</div>';
+
+    const glossaryHtml = glossary.length ? `<ul>${glossary.map(e => `<li><b>${escapeHtml(e.name || '')}</b> <span class="ts">(${escapeHtml(e.type || '')})</span></li>`).join('')}</ul>` : '<div class="muted">No entities.</div>';
+
+    out.innerHTML = `
+      <div class="detail-head">
+        <button class="back" id="back-btn">← Back</button>
+        <h2>${escapeHtml(video.title || '(no title)')}</h2>
+      </div>
+      <div class="meta-row">
+        <span class="chip">${escapeHtml(video.channel_name || 'unknown channel')}</span>
+        ${video.published_at ? `<span class="chip">${escapeHtml(video.published_at.slice(0,10))}</span>` : ''}
+        ${video.duration ? `<span class="chip">${fmtTs(video.duration)}</span>` : ''}
+        ${analysis ? `<span class="chip">prompt ${escapeHtml(analysis.prompt_version || '')}</span>` : ''}
+        ${analysis ? `<span class="chip">${escapeHtml(analysis.model || '')}</span>` : ''}
+        <a class="chip" href="https://www.youtube.com/watch?v=${videoId}" target="_blank" style="text-decoration:none">YouTube ↗</a>
+      </div>
+
+      <div class="section">
+        <h3>TL;DR</h3>
+        <p>${escapeHtml(tldr || 'No summary available.')}</p>
+        ${argument ? `<p><b>The argument:</b> ${escapeHtml(argument)}</p>` : ''}
+      </div>
+
+      <div class="section">
+        <h3>Key Concepts (${concepts.length})</h3>
+        ${conceptHtml}
+      </div>
+
+      <div class="section">
+        <h3>Actionable Takeaways (${takeaways.length})</h3>
+        ${takeawayHtml}
+      </div>
+
+      <div class="section">
+        <h3>Claims to Verify (${claims.length})</h3>
+        ${claimHtml}
+      </div>
+
+      <div class="section">
+        <h3>Glossary (${glossary.length})</h3>
+        ${glossaryHtml}
+      </div>
+
+      <div class="section">
+        <h3>Source</h3>
+        <details>
+          <summary>Show full markdown analysis</summary>
+          <div class="markdown">${escapeHtml(markdown || '_(no markdown stored)_')}</div>
+        </details>
+        ${transcriptText ? `
+          <details>
+            <summary>Show full transcript (${transcriptText.length.toLocaleString()} chars)</summary>
+            <div class="transcript-text">${escapeHtml(transcriptText)}</div>
+          </details>
+        ` : '<div class="muted" style="margin-top:8px">No transcript stored.</div>'}
+      </div>
+    `;
+    document.getElementById('back-btn').addEventListener('click', () => showPanel('videos'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    out.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div><div style="margin-top:10px"><button class="ghost" onclick="showPanel('videos')">← Back to videos</button></div>`;
+  }
+}
+
+async function loadChannels() {
+  const out = document.getElementById('channels-list');
+  out.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const data = await jget('/channels');
+    if (!data.channels.length) { out.innerHTML = '<div class="empty">No channels watched yet.</div>'; return; }
+    out.innerHTML = data.channels.map(c => `
+      <div class="video-row" data-cid="${escapeHtml(c.channel_id)}">
+        <div class="meta">
+          <div class="vtitle">${escapeHtml(c.channel_name || c.channel_id)}</div>
+          <div class="vch">last polled: ${c.last_polled_at || 'never'} · last seen: ${escapeHtml(c.last_seen_video_id || 'none')}</div>
+        </div>
+        <button class="ghost" data-remove="${escapeHtml(c.channel_id)}" style="flex:0 0 auto">Remove</button>
+      </div>
+    `).join('');
+    out.querySelectorAll('button[data-remove]').forEach(b => {
+      b.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const cid = b.dataset.remove;
+        if (!confirm(`Stop watching this channel?`)) return;
+        try {
+          await fetch(`/channels/${encodeURIComponent(cid)}`, { method: 'DELETE' });
+          loadChannels();
+        } catch (err) { alert('Remove failed: ' + err.message); }
+      });
+    });
+  } catch (e) { out.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div>`; }
+}
+
+async function doAddChannel() {
+  const url = document.getElementById('addchurl').value.trim();
+  if (!url) return;
+  const out = document.getElementById('addch-out');
+  out.innerHTML = '<div class="loading">Resolving channel…</div>';
+  try {
+    const r = await jpost('/channels', { url });
+    out.innerHTML = `<div class="result" style="margin-top:8px"><div class="title">Added: ${escapeHtml(r.channel_name)}</div><div class="vch">${escapeHtml(r.channel_id)}</div></div>`;
+    document.getElementById('addchurl').value = '';
+    loadChannels();
+    loadStats();
+  } catch (e) { out.innerHTML = `<div class="err">Error: ${escapeHtml(e.message)}</div>`; }
+}
+document.getElementById('addchgo').addEventListener('click', doAddChannel);
+document.getElementById('addchurl').addEventListener('keydown', e => { if (e.key === 'Enter') doAddChannel(); });
+
+loadStats();
+loadStatus();
+setInterval(loadStatus, 60000);
+</script>
+</body>
+</html>

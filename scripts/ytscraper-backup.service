@@ -1,0 +1,12 @@
+[Unit]
+Description=YTTranscriptScraper nightly DB backup
+
+[Service]
+Type=oneshot
+User=ytscraper
+Group=ytscraper
+WorkingDirectory=/opt/ytscraper
+EnvironmentFile=/opt/ytscraper/.env
+ExecStart=/opt/ytscraper/.venv/bin/python -m src.cli backup
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,79 @@
+You are synthesising a final, human-readable analysis from many chunk-level extractions of a single video.
+
+# Input
+
+Video title: {title}
+Channel: {channel}
+Duration: {duration}
+URL: {url}
+
+Chunk-level extractions (one JSON object per chunk, in order):
+{chunk_extractions}
+
+# Task
+
+Produce a single JSON object that synthesises everything into the final deliverable. This is what the user will read and what an agent will consume.
+
+# Output schema
+
+Return strict JSON, no commentary, no markdown fences:
+
+{{
+  "tldr": "three sentences max, capturing what this video is and its main point",
+  "argument": "the through-line or thesis, in 2-4 sentences. If the video is a collection of tips without a single thesis, write exactly: 'No single argument; this is a collection of tips.'",
+  "key_concepts": [
+    {{"name": "Concept", "definition": "definition", "first_timestamp_seconds": 123}}
+  ],
+  "takeaways": [
+    {{"text": "actionable advice", "category": "category label e.g. 'productivity' or 'engineering'"}}
+  ],
+  "claims_to_verify": [
+    {{"text": "factual claim", "timestamp_seconds": 456}}
+  ],
+  "glossary": [
+    {{"name": "Entity", "type": "person|company|tool|paper|other"}}
+  ],
+  "markdown": "a clean markdown rendering for humans, see layout below"
+}}
+
+# Markdown layout
+
+```
+# {title}
+
+**Channel:** {channel} | **URL:** {url} | **Duration:** {duration}
+
+## TL;DR
+<three sentences>
+
+## The Argument
+<2-4 sentences, or 'No single argument; this is a collection of tips.'>
+
+## Key Concepts
+- **Concept** — definition _(at MM:SS)_
+- ...
+
+## Actionable Takeaways
+### <category>
+- takeaway
+### <category>
+- takeaway
+
+## Claims to Verify
+- claim _(at MM:SS)_ — why this should be checked
+
+## Glossary
+- **Entity** (type) — _first mentioned at MM:SS_
+
+## Source
+Transcript analysed in {n_chunks} chunks. {transcript_length} characters.
+```
+
+# Rules
+
+- Deduplicate across chunks. A concept introduced in chunk 2 and referenced in chunk 5 should appear once, with first_timestamp_seconds from chunk 2.
+- Drop vague takeaways like "be careful" or "think about it" — only concrete actions.
+- For claims_to_verify: only include claims marked verifiable in the chunk extractions. Skip opinions.
+- Timestamps in the markdown should be MM:SS, rounded down.
+- Be precise. Don't editorialize. Don't invent.
+- Length budget: markdown should be readable in 60 seconds. Tight.

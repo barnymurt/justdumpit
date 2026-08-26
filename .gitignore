@@ -1,0 +1,35 @@
+# Output folder
+output/
+
+# SQLite database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+kb.db
+
+# Backups
+backups/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+
+# Environment
+.env
+*.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

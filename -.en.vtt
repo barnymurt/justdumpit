@@ -1,0 +1,440 @@
+WEBVTT
+Kind: captions
+Language: en
+
+00:00:00.080 --> 00:00:05.120
+Previous works have shown us that fire&nbsp;
+simulation is possible. You can set a&nbsp;&nbsp;
+
+00:00:05.120 --> 00:00:11.680
+virtual tree on fire and see what happens.&nbsp;
+Or, on a bigger scale, simulating wildfires!&nbsp;
+
+00:00:11.680 --> 00:00:17.200
+But what about extinguishing the&nbsp;
+fire? Not like this. With water!
+
+00:00:17.200 --> 00:00:21.840
+Well, I found an amazing research&nbsp;
+work on that too! Yoohoo!
+
+00:00:21.840 --> 00:00:24.800
+Now, there are different types of flames,&nbsp;&nbsp;
+
+00:00:24.800 --> 00:00:30.720
+depending on what kind of chemical created&nbsp;
+them. This incredible work models that too,&nbsp;&nbsp;
+
+00:00:30.720 --> 00:00:36.000
+that is already stunning. But it’s&nbsp;
+nothing compared to what it can do.
+
+00:00:36.000 --> 00:00:41.680
+So the main problem is that fire simulations&nbsp;
+are like the ones in video games. It’s like a&nbsp;&nbsp;
+
+00:00:41.680 --> 00:00:47.440
+plastic display burger in a restaurant&nbsp;
+ad. It looks fine, until you touch it,&nbsp;&nbsp;
+
+00:00:47.440 --> 00:00:52.800
+or if you throw a bucket of water on&nbsp;
+it, nothing happens - the water just&nbsp;&nbsp;
+
+00:00:52.800 --> 00:00:58.720
+clips right through it! This problem goes&nbsp;
+way beyond games, such a thing could be&nbsp;&nbsp;
+
+00:00:58.720 --> 00:01:04.800
+amazing for fire safety training too! You could&nbsp;
+actually try to train firefighters by putting&nbsp;&nbsp;
+
+00:01:04.800 --> 00:01:11.280
+out realistic fires in VR. But you can’t do&nbsp;
+that if the fire is ignoring the water hose!
+
+00:01:11.280 --> 00:01:17.360
+So, how do we fix this? Well, this new research&nbsp;
+work says just give it the geometry of the scene,&nbsp;&nbsp;
+
+00:01:17.360 --> 00:01:23.440
+a fuel source, and a water source. And it&nbsp;
+promises a chemically rigorous simulation&nbsp;&nbsp;
+
+00:01:23.440 --> 00:01:28.720
+where the fire actually dies if you&nbsp;
+starve it of oxygen or cool it down.
+
+00:01:28.720 --> 00:01:34.800
+Here is the crazy thing. You can even mix&nbsp;
+different fuel types and fuel-oxygen ratios&nbsp;&nbsp;
+
+00:01:34.800 --> 00:01:41.360
+and they create completely different kinds of&nbsp;
+flames. How an Earth did they do that? Wow.
+
+00:01:41.360 --> 00:01:48.800
+And when we hit the fire with water, we finally&nbsp;
+get some vapor! So cool. It’s really tough to&nbsp;&nbsp;
+
+00:01:48.800 --> 00:01:55.360
+put out though, look, even if you aim at&nbsp;
+the base… it didn’t do a great deal. Why?
+
+00:01:55.360 --> 00:02:02.480
+Because a laminar flow is essentially a solid&nbsp;
+beam of water with minimal surface area,&nbsp;&nbsp;
+
+00:02:02.480 --> 00:02:06.240
+which limits its ability to&nbsp;
+absorb heat from the flames.
+
+00:02:06.240 --> 00:02:14.960
+Now let’s try a proper spray instead. Does this&nbsp;
+work better? Oh my, you bet it does! Why exactly?
+
+00:02:14.960 --> 00:02:20.320
+This works beautifully because breaking&nbsp;
+the water into thousands of tiny droplets&nbsp;&nbsp;
+
+00:02:20.320 --> 00:02:27.280
+increases the surface area for heat absorption.&nbsp;
+This cools the area down instantly while, look,&nbsp;&nbsp;
+
+00:02:27.280 --> 00:02:30.960
+the huge expanding steam suffocates the fire.
+
+00:02:30.960 --> 00:02:36.400
+Now this is a virtual world, so we&nbsp;
+can try funny things. You often hear&nbsp;&nbsp;
+
+00:02:36.400 --> 00:02:43.760
+the term adding fuel to the fire. So&nbsp;
+why not do that? Oh wow, look at that!
+
+00:02:43.760 --> 00:02:48.400
+Now note that the visuals are not the&nbsp;
+state of the art. I need to mention that&nbsp;&nbsp;
+
+00:02:48.400 --> 00:02:54.160
+simulation and visualization are different&nbsp;
+disciplines. The true treasure here is the&nbsp;&nbsp;
+
+00:02:54.160 --> 00:02:59.520
+accurate chemistry simulated under&nbsp;
+the hood, and not the pretty pixels.
+
+00:02:59.520 --> 00:03:07.120
+Now it advects the fire, and also starts scorching&nbsp;
+this wall next to it. Look closely at how the wall&nbsp;&nbsp;
+
+00:03:07.120 --> 00:03:13.040
+darkens over time - this is not just some&nbsp;
+pre-computed color being slapped on it! The&nbsp;&nbsp;
+
+00:03:13.040 --> 00:03:19.440
+simulation actually tracks the formation of soot&nbsp;
+during incomplete combustion and even deposits&nbsp;&nbsp;
+
+00:03:19.440 --> 00:03:27.360
+them onto the object's surface. It simulates the&nbsp;
+environment having a memory of being burned. Wow.
+
+00:03:27.360 --> 00:03:32.320
+Now, real life firefighting gets so much&nbsp;
+more intricate than these toy examples,&nbsp;&nbsp;
+
+00:03:32.320 --> 00:03:39.920
+so let’s put it to the real test. Can it simulate&nbsp;
+this? Okay, wait, so what is happening here?&nbsp;&nbsp;
+
+00:03:39.920 --> 00:03:47.360
+This is a brilliant application of the Venturi&nbsp;
+effect. They are spraying water not into the&nbsp;&nbsp;
+
+00:03:47.360 --> 00:03:55.280
+window. But out of the window, that is the key.&nbsp;
+Why? Well, if you do that at a high speed, you&nbsp;&nbsp;
+
+00:03:55.280 --> 00:04:01.280
+lower the air pressure there, which essentially&nbsp;
+vacuums the smoke and heat out of the room.
+
+00:04:01.280 --> 00:04:06.000
+It is like a massive truck speeding&nbsp;
+down a highway. This creates a gust&nbsp;&nbsp;
+
+00:04:06.000 --> 00:04:09.200
+of wind that pulls dry leaves behind it.
+
+00:04:09.200 --> 00:04:14.640
+The simulator cannot possibly be so&nbsp;
+smart to understand this right? Let’s&nbsp;&nbsp;
+
+00:04:14.640 --> 00:04:19.920
+see…I can’t believe my eyes. This is incredible!
+
+00:04:19.920 --> 00:04:25.920
+Now one other detail that completely blew&nbsp;
+me away is the annealing simulation. Here&nbsp;&nbsp;
+
+00:04:25.920 --> 00:04:31.760
+they heat up a metal rod, and when the&nbsp;
+flame is removed, the rod stays glowing&nbsp;&nbsp;
+
+00:04:31.760 --> 00:04:37.360
+and slowly cools down. It even creates&nbsp;
+its own light source! This wasn't even&nbsp;&nbsp;
+
+00:04:37.360 --> 00:04:43.200
+the main point of the paper, but it adds&nbsp;
+so much realism. I absolutely love this.
+
+00:04:43.200 --> 00:04:48.560
+Okay, now, the two final boss scenes,&nbsp;
+and then I’ll tell you how it works.
+
+00:04:48.560 --> 00:04:56.400
+Boss level 1. Three cars burning with massive&nbsp;
+flames. Yes! Finally! This puts it all together.&nbsp;&nbsp;
+
+00:04:56.400 --> 00:05:02.000
+This is a multiphase experiment. This is a&nbsp;
+fancy way of saying that the Holy Trinity&nbsp;&nbsp;
+
+00:05:02.000 --> 00:05:09.680
+of physics states are all fighting each other:&nbsp;
+solids, liquids and gases. All at the same time.
+
+00:05:09.680 --> 00:05:15.840
+You see that this is not just deleting the&nbsp;
+fire. The liquid water hits the hot gas,&nbsp;&nbsp;
+
+00:05:15.840 --> 00:05:21.600
+absorbs the heat, and transforms into white&nbsp;
+steam that mixes with the black smoke.
+
+00:05:21.600 --> 00:05:27.440
+It is a chaotic, beautiful mess of&nbsp;
+thermodynamics! The water fights the fire,&nbsp;&nbsp;
+
+00:05:27.440 --> 00:05:32.160
+the fire fights the air, and&nbsp;
+the steam fights for space.&nbsp;&nbsp;
+
+00:05:32.160 --> 00:05:38.560
+The simulation is calculating the chemistry&nbsp;
+of extinction. And now hold on to your papers&nbsp;&nbsp;
+
+00:05:38.560 --> 00:05:45.440
+Fellow Scholars, because all this happens&nbsp;
+in real-time. Yup. I am out of words.
+
+00:05:45.440 --> 00:05:49.440
+Now let’s demonstrate how this&nbsp;
+kind of knowledge can save lives.
+
+00:05:49.440 --> 00:05:55.440
+Here we have a kitchen fire starting on a&nbsp;
+stove. We activate the sprinkler with just&nbsp;&nbsp;
+
+00:05:55.440 --> 00:06:03.680
+a tiny bit of delay. A tiny bit. And look. Oh&nbsp;
+goodness! The fire grows, climbs the walls,&nbsp;&nbsp;
+
+00:06:03.680 --> 00:06:10.160
+eats the ceiling, and fills the whole room with&nbsp;
+thick, black smoke. It is a total disaster.
+
+00:06:10.160 --> 00:06:16.880
+Now a simulation technique like this can help us&nbsp;
+imagine a what if scenario. What if we activated&nbsp;&nbsp;
+
+00:06:16.880 --> 00:06:22.720
+the sprinkler just a bit earlier? Probably&nbsp;
+doesn’t matter right? Well, hold on to your&nbsp;&nbsp;
+
+00:06:22.720 --> 00:06:28.720
+papers Fellow Scholars, yes, again, and look at&nbsp;
+the difference! In the second timeline, the water&nbsp;&nbsp;
+
+00:06:28.720 --> 00:06:36.880
+spray cools the reaction instantly. You see the&nbsp;
+fire turn into a puff of white vapor and die out.
+
+00:06:36.880 --> 00:06:43.440
+This proves why this isn't just a toy for&nbsp;
+making video games look cool. No! This is&nbsp;&nbsp;
+
+00:06:43.440 --> 00:06:49.040
+a virtual safety lab. Don’t forget,&nbsp;
+this is accurate and fast. With this,&nbsp;&nbsp;
+
+00:06:49.040 --> 00:06:54.080
+we can test millions of what if scenarios&nbsp;
+- different sprinkler positions,&nbsp;&nbsp;
+
+00:06:54.080 --> 00:07:00.800
+different delays and fuels. All this without&nbsp;
+ever having to burn down a single house.
+
+00:07:00.800 --> 00:07:06.240
+Okay, so how is all this magic possible?&nbsp;
+How did they do that? Dear Fellow Scholars,&nbsp;&nbsp;
+
+00:07:06.240 --> 00:07:09.200
+this is Two Minute Papers&nbsp;
+with Dr. Károly Zsolnai-Fehér.
+
+00:07:09.200 --> 00:07:16.320
+Well, first of all, this doesn’t use any AI&nbsp;
+whatsoever. Only human brilliance. Okay. The&nbsp;&nbsp;
+
+00:07:16.320 --> 00:07:22.720
+reason previous techniques failed is that fire&nbsp;
+and water in a computer speak two completely&nbsp;&nbsp;
+
+00:07:22.720 --> 00:07:28.320
+different languages. The fire lives on&nbsp;
+a grid - imagine a giant 3D spreadsheet&nbsp;&nbsp;
+
+00:07:28.320 --> 00:07:35.120
+of boxes that calculates airflow and&nbsp;
+temperature. But the water…the water&nbsp;&nbsp;
+
+00:07:35.120 --> 00:07:41.840
+lives as particles - like millions of tiny sand&nbsp;
+grains floating freely. In older simulations,&nbsp;&nbsp;
+
+00:07:41.840 --> 00:07:47.600
+these two worlds couldn't talk to each other&nbsp;
+fast enough, so the water particles would just&nbsp;&nbsp;
+
+00:07:47.600 --> 00:07:54.400
+fly through the fire grid like ghosts. To fix&nbsp;
+this, these amazing scientists built a high-speed&nbsp;&nbsp;
+
+00:07:54.400 --> 00:08:01.840
+translator that sits between these two worlds&nbsp;
+and forces them to interact. That is brilliant.
+
+00:08:01.840 --> 00:08:07.760
+Okay, so why is that important? Well, here&nbsp;
+comes the magic. Because of this new translator,&nbsp;&nbsp;
+
+00:08:07.760 --> 00:08:13.600
+the water and fire can finally speak to&nbsp;
+each other. When a droplet hits a hot spot,&nbsp;&nbsp;
+
+00:08:13.600 --> 00:08:18.400
+it demands some heat from the fire,&nbsp;
+and because they are connected,&nbsp;&nbsp;
+
+00:08:18.400 --> 00:08:24.240
+the fire has to give it up. The water&nbsp;
+uses that stolen heat to turn into steam.
+
+00:08:24.240 --> 00:08:30.320
+This creates a chain reaction where the fire&nbsp;
+cools down, and the new steam crowds the room,&nbsp;&nbsp;
+
+00:08:30.320 --> 00:08:36.880
+pushing the oxygen away to suffocate the&nbsp;
+flames. And now all of these speak the same&nbsp;&nbsp;
+
+00:08:36.880 --> 00:08:42.960
+language. The water can finally extinguish&nbsp;
+the fire instead of just passing through it.
+
+00:08:42.960 --> 00:08:49.440
+But that’s not all. Not even close. Under the&nbsp;
+hood, the simulation uses a famous mathematical&nbsp;&nbsp;
+
+00:08:49.440 --> 00:08:56.240
+formula called the Arrhenius equation to control&nbsp;
+the fire. Think of this as the fire's gas pedal.&nbsp;&nbsp;
+
+00:08:56.240 --> 00:09:02.400
+It calculates exactly how fast the fuel should&nbsp;
+burn based on the current heat and the available&nbsp;&nbsp;
+
+00:09:02.400 --> 00:09:08.960
+oxygen. Because this equation is super sensitive&nbsp;
+to temperature, even a small splash of water that&nbsp;&nbsp;
+
+00:09:08.960 --> 00:09:15.360
+lowers the heat causes the math to slam on the&nbsp;
+brakes, instantly stopping the chemical reaction.&nbsp;&nbsp;
+
+00:09:15.360 --> 00:09:21.760
+So, the fire physically stops burning&nbsp;
+simply because the math says it is too cold.
+
+00:09:22.720 --> 00:09:28.560
+Now, surprisingly, there is so much more to learn&nbsp;
+here. Not just about simulation techniques, but&nbsp;&nbsp;
+
+00:09:28.560 --> 00:09:36.800
+about life itself. You see, the simulation proves&nbsp;
+that a solid beam of water fails, but a spray&nbsp;&nbsp;
+
+00:09:36.800 --> 00:09:43.760
+succeeds because it maximizes contact area. That&nbsp;
+is great life advice! Sometimes you don’t need to&nbsp;&nbsp;
+
+00:09:43.760 --> 00:09:51.040
+solve a crisis with one huge heroic effort. Break&nbsp;
+the solution down into many tiny droplets. Tiny&nbsp;&nbsp;
+
+00:09:51.040 --> 00:09:57.520
+little tasks. You might find that they absorb&nbsp;
+the heat of the problem much better. So good.
+
+00:09:57.520 --> 00:10:04.560
+Also, remember, the paper simulates the kitchen&nbsp;
+disaster before it happens. You can do that too!&nbsp;&nbsp;
+
+00:10:04.560 --> 00:10:09.680
+Imagine yourself in the future and imagine&nbsp;
+that your friendships, marriage or career&nbsp;&nbsp;
+
+00:10:09.680 --> 00:10:16.480
+has already failed. Now the question is, if&nbsp;
+it failed, why did it fail? Work backwards to&nbsp;&nbsp;
+
+00:10:16.480 --> 00:10:22.880
+find the cause. Then, like the sprinkler, you&nbsp;
+can fix the problem before it even happens.
+
+00:10:22.880 --> 00:10:28.080
+Okay, with all that said, let’s not&nbsp;
+overstate things. Yup, not even this&nbsp;&nbsp;
+
+00:10:28.080 --> 00:10:34.000
+technique is perfect. The authors note that&nbsp;
+the solids in the simulation are static. The&nbsp;&nbsp;
+
+00:10:34.000 --> 00:10:39.600
+geometry has to be fixed, so that’s why you&nbsp;
+are seeing simulations with lots of metal,&nbsp;&nbsp;
+
+00:10:39.600 --> 00:10:46.480
+and not elastic trees burning. I think that&nbsp;
+is an acceptable tradeoff. But of course,&nbsp;&nbsp;
+
+00:10:46.480 --> 00:10:53.200
+here we invoke the First Law of Papers, which says&nbsp;
+that research is a process. Do not look at where&nbsp;&nbsp;
+
+00:10:53.200 --> 00:10:59.760
+we are, look at where we will be two more papers&nbsp;
+down the line. And in two more papers, baby,&nbsp;&nbsp;
+
+00:10:59.760 --> 00:11:06.240
+I am sure this is going to simulate an entire&nbsp;
+city. Now that would be incredible. And super&nbsp;&nbsp;
+
+00:11:06.240 --> 00:11:11.280
+useful too. Subscribe, hit the bell and leave&nbsp;
+a kind comment if you enjoyed this. Thank you!
+

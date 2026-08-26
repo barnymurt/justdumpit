@@ -1,0 +1,14 @@
+[Unit]
+Description=YTTranscriptScraper sync job (one-shot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ytscraper
+Group=ytscraper
+WorkingDirectory=/opt/ytscraper
+EnvironmentFile=/opt/ytscraper/.env
+ExecStart=/opt/ytscraper/.venv/bin/python -m src.cli sync
+StandardOutput=journal
+StandardError=journal

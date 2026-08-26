@@ -1,0 +1,25 @@
+[Unit]
+Description=YTTranscriptScraper API server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ytscraper
+Group=ytscraper
+WorkingDirectory=/opt/ytscraper
+EnvironmentFile=/opt/ytscraper/.env
+ExecStart=/opt/ytscraper/.venv/bin/python -m src.cli server --host=127.0.0.1 --port=8765
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ytscraper
+
+[Install]
+WantedBy=multi-user.target

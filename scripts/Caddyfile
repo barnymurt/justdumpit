@@ -1,0 +1,16 @@
+# Caddy will auto-issue a Let's Encrypt cert for __DOMAIN__ on first request.
+__DOMAIN__ {
+    encode gzip
+    reverse_proxy 127.0.0.1:8765 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    log {
+        output file /var/log/caddy/ytscraper.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}

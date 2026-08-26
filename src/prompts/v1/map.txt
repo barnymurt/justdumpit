@@ -1,0 +1,48 @@
+You are extracting structured information from a single chunk of a video transcript. The chunk is part "{part_label}" of {total_chunks}.
+
+# Input
+
+Video title: {title}
+Channel: {channel}
+Chunk timestamp range: {start_ts} -> {end_ts}
+
+Transcript chunk:
+```
+{transcript}
+```
+
+# Task
+
+Extract every piece of structured information present in this chunk. Be precise — only extract what the speaker actually said in this chunk. If a category is empty, return an empty list.
+
+# Output schema
+
+Return strict JSON, no commentary, no markdown fences. The response MUST parse with json.loads:
+
+{{
+  "claims": [
+    {{"text": "specific factual assertion as stated", "timestamp_seconds": 12.4, "verifiable": true}}
+  ],
+  "concepts": [
+    {{"name": "Concept Name", "definition": "one-line definition drawn from how the speaker uses it", "first_timestamp_seconds": 30.1}}
+  ],
+  "examples": [
+    {{"summary": "what the example illustrates", "timestamp_seconds": 45.0}}
+  ],
+  "actions": [
+    {{"text": "imperative statement of what to do", "timestamp_seconds": 60.2}}
+  ],
+  "entities": [
+    {{"name": "person/company/tool/paper name", "type": "person|company|tool|paper|other", "first_timestamp_seconds": 75.0}}
+  ]
+}}
+
+# Rules
+
+- "claims" are statements the speaker asserts as fact. Set "verifiable": true if a human could check it against a public source; false if it's opinion, preference, or personal experience.
+- "concepts" are named ideas the speaker introduces or explains.
+- "examples" are concrete cases the speaker gives to illustrate something.
+- "actions" are anything phrased as advice or instructions to the listener (e.g., "you should", "do this", "the way to...").
+- "entities" are proper nouns: people, companies, tools, papers, products.
+- Timestamps in seconds, use the chunk range as a hint. Do not invent timestamps outside the chunk's range.
+- Maximum 15 items per category per chunk. Prioritise the most important.

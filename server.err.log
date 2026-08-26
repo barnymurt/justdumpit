@@ -1,0 +1,69 @@
+INFO:     Started server process [47224]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 1281, in handle
+    await super().handle(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 280, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 145, in app
+    await response(scope, receive, send)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\responses.py", line 167, in __call__
+    await send({"type": "http.response.body", "body": self.body})
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 39, in sender
+    await send(message)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 39, in sender
+    await send(message)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 161, in _send
+    await send(message)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 507, in send
+    output = self.conn.send(event=h11.Data(data=data))
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\h11\_connection.py", line 538, in send
+    data_list = self.send_with_data_passthrough(event)
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\h11\_connection.py", line 571, in send_with_data_passthrough
+    writer(event, data_list.append)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\h11\_writers.py", line 65, in __call__
+    self.send_data(event.data, write)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bmurt\AppData\Roaming\Python\Python314\site-packages\h11\_writers.py", line 91, in send_data
+    raise LocalProtocolError("Too much data for declared Content-Length")
+h11._util.LocalProtocolError: Too much data for declared Content-Length
