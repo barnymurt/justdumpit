@@ -88,6 +88,8 @@ def status():
 class AnalyseRequest(BaseModel):
     url: str = Field(..., description="YouTube video URL or 11-char video ID")
     model: Optional[str] = Field(None)
+    prompt_version: str = Field("v2", description="v1 (legacy) or v2 (atoms + Stage 2)")
+    send_email: bool = Field(False, description="Email the analysis after Stage 2")
 
 
 def _do_analyse(url: str, model: str) -> dict:
@@ -143,7 +145,24 @@ def analyse(req: AnalyseRequest, background: BackgroundTasks):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
-    return result
+    payload = result.copy() if hasattr(result, "copy") else dict(result)
+
+    if req.prompt_version == "v2" and payload.get("transferable_atoms"):
+        try:
+            from src.stage2 import score_video, persist_stage2, load_goals
+            cfg = load_goals()
+            s2 = score_video(
+                video_id=payload["video_id"],
+                extraction=payload,
+                cfg=cfg,
+                model=model,
+            )
+            persist_stage2(payload["video_id"], s2, prompt_version="v2")
+            payload["stage2"] = s2.to_dict()
+        except Exception as e:
+            payload["stage2_error"] = str(e)
+
+    return payload
 
 
 @app.get("/video/{video_id}")
