@@ -1,0 +1,348 @@
+# Consumed by stage 2 of the video-to-action pipeline.
+# Each video's stage 1 extraction is scored against every goal here.
+# Actions proposed by the downstream agent are routed through the
+# authority tiers defined at the bottom of this file.
+
+version: 2
+owner: barnymurt
+last_reviewed: 2026-08-27
+
+# --- GOALS ---
+
+goals:
+
+  - id: dev_workflow
+    name: Improve dev workflows across my GitHub repos
+    priority: 1  # runs first; cheapest to act on
+    description: >
+      Reduce toil, increase velocity, or improve reliability across my
+      active repos. Auto-executable when scoped to non-critical changes.
+
+    scope:
+      applies_to:
+        - CI/CD patterns
+        - agent-assisted coding workflows
+        - repo hygiene (issues, docs, PR templates)
+        - local dev tooling
+        - testing / eval infrastructure
+        - prompt / skill patterns for coding agents
+      excludes:
+        - production deployment changes without a proposal
+        - anything touching auth, secrets, or credentials
+
+    scoring_rubric:
+      3: >
+        Video proposes a specific tool, config, or pattern I could adopt
+        in <2h that plausibly saves >2h/week or catches a real class of bug.
+      2: >
+        Pattern requiring a spike (2-8h) with plausible payoff, or a small
+        pattern with uncertain payoff.
+      1: >
+        Interesting concept, no concrete implementation path, or requires
+        rework I don't currently need.
+      0: >
+        Not applicable — content is about non-dev workflows.
+
+    constraints:
+      max_effort_per_action_hours: 8
+      required_evidence: at_least_one_atom_of_type[implementation_pattern, tool_recipe]
+
+    default_authority: tier_1_auto_with_notification  # auto-execute with notification
+
+  - id: side_income
+    name: Small side income streams ($500-2k/mo, <10h/wk)
+    priority: 2
+    description: >
+      Identify opportunities to generate modest recurring income. The
+      goal is EXPLORATION — surface new sectors, models, and niches
+      beyond what I've already started. Do not filter to existing bets.
+
+    scope:
+      applies_to:
+        - any productized service, tool, content, or micro-SaaS with a
+          clear revenue model and testable demand signal
+        - affiliate / rev-share angles with clear economics
+        - opportunities in sectors I have not yet touched
+      excludes:
+        - anything requiring FT commitment
+        - low-margin arbitrage, dropshipping, general e-com
+        - anything requiring a new legal entity to invoice from
+        - schemes without a defensible mechanism of value creation
+
+    scoring_rubric:
+      3: >
+        Concrete opportunity with a demonstrated revenue model in the
+        video, testable in <10h, and a clear signal of demand. Sector
+        irrelevant — new sectors score just as high as familiar ones.
+      2: >
+        Adjacent opportunity or requires validation; economics plausible
+        but not proven in the video.
+      1: >
+        Idea seed only; would need substantial validation before acting.
+      0: >
+        Not applicable, or fails the excludes list.
+
+    constraints:
+      required_evidence: at_least_one_atom_of_type[business_model, revenue_pattern]
+      exploration_bonus: >
+        If the atom describes a sector I have not previously worked in,
+        do NOT penalize relevance. Novelty is a feature of this goal.
+
+    default_authority: tier_3_explicit_green_light  # always ask before doing
+
+  - id: agent_run_business
+    name: Self-maintaining business run by agents
+    priority: 3
+    description: >
+      Patterns, architectures, and org models for businesses that agents
+      operate autonomously. Includes but is not limited to ideas that
+      inform MCPPay — a video about a totally new agent-operated business
+      in an unfamiliar sector is equally valid.
+
+    scope:
+      applies_to:
+        - multi-agent orchestration patterns
+        - agent-first software design
+        - autonomy taxonomies and escalation models
+        - payment / settlement infrastructure for agents
+        - agent workforce org structures
+        - eval / monitoring patterns for agent orgs
+        - business models where agents are the primary operators
+      excludes:
+        - anything requiring fundraising, incorporation, or irreversible
+          commitment
+        - proposals to publicly commit to a product direction
+
+    scoring_rubric:
+      3: >
+        Concrete pattern, architecture, tool, or business model relevant
+        to running a business with agents — whether or not it connects
+        to my existing work.
+      2: >
+        Transferable pattern that needs adaptation, or informs a longer-
+        term design decision.
+      1: >
+        Interesting but abstract; no clear implementation path.
+      0: >
+        Not applicable.
+
+    constraints:
+      required_evidence: at_least_one_atom_of_type[architecture, framework, org_pattern, business_model]
+
+    default_authority: tier_3_explicit_green_light  # propose only; never auto-execute
+
+# --- AUTHORITY TIERS ---
+# The downstream action-agent MUST classify each proposed action into
+# one of these tiers before executing. The applied tier is the MAX of
+# (goal.default_authority, tier from tier_overrides). Higher always wins.
+
+authority_tiers:
+
+  tier_0_auto:
+    description: >
+      Fully reversible, local-only, no external surface. Agent executes
+      without notification.
+    examples:
+      - Create a branch in a scratch / experiment repo
+      - Run a benchmark or eval locally
+      - Draft notes in a private Notion page
+
+  tier_1_auto_with_notification:
+    description: >
+      Reversible via a single undo (revert commit, close PR). No cost,
+      no external audience. Agent executes and posts a summary within 1h.
+    examples:
+      - Open a draft PR in one of my repos
+      - Add or update a README section
+      - File a GitHub issue against my own repo
+      - Update a repo's PR / issue template
+    requires:
+      - Target repo owned by me
+      - Change touches only docs, CI config, or non-production paths
+
+  tier_2_propose_with_artifact:
+    description: >
+      Agent produces a written proposal (spec, cost estimate, rollback
+      plan) and posts it for me to green-light. Nothing happens without
+      my explicit "go".
+    examples:
+      - Minor change to a live product I own (copy updates, cosmetic UI
+        changes, non-breaking additions)
+      - Spike a new side-project repo
+      - Draft a piece of public content (never published without go)
+      - Propose a new architectural pattern for consideration
+    requires:
+      - Proposal document created and linked in the notification
+      - Explicit "go" from me in reply — NOT a thumbs-up emoji
+      - Agent must restate the exact action being approved before acting
+
+  tier_3_explicit_green_light:
+    description: >
+      As tier 2, plus a mandatory pre-check block the agent must complete
+      AND I must review before execution. Used for substantial changes,
+      external surfaces, cost, brand, or client work.
+    pre_check_block:
+      - What is the smallest reversible version of this action?
+      - What does it commit me to (time, money, brand, contractual)?
+      - What is the rollback path if this goes wrong in 30 days?
+      - Who or what outside my control does it depend on?
+      - What is the demand signal I'm acting on? (side_income only)
+    examples:
+      - Substantial change to a live product I own — user-facing feature,
+        pricing, data model, or anything that materially affects users
+      - Any change to Hazelrigg (client / third-party involved)
+      - Spend money (any amount, including free-trials that auto-bill)
+      - Register a domain
+      - Publish anything under my name (blog, tweet, external PR)
+      - Contact any external party (email, DM, form)
+      - Deploy anything to a live endpoint
+
+  tier_4_hard_stop:
+    description: >
+      Agent must never execute. If a proposed action falls here, agent
+      halts, logs the reason, pings me — no partial execution, no
+      "prep work".
+    examples:
+      - Anything touching my invoicing or NHR tax setup
+      - Incorporating an entity, signing anything
+      - Any change to auth, secrets, or credentials across my stack
+      - Any Cardano on-chain transaction from my wallets
+      - Any commitment to a third party (verbal or written)
+      - Any action affecting my partner or child's data / logistics
+
+# --- IMPACT CLASSIFICATION ---
+# For any action touching a live product I own, the agent must classify
+# impact before selecting a tier. Definitions:
+
+impact_classification:
+  substantial:
+    description: >
+      Materially affects users, revenue, data integrity, or the product's
+      public identity. Routes to tier_3.
+    criteria:
+      - user-facing feature addition, removal, or behavior change
+      - pricing, billing, or plan structure change
+      - data model or persistence change
+      - change affecting >5% of active users
+      - anything that would be worth mentioning in release notes
+
+  minor:
+    description: >
+      Small, non-breaking, easily reversed. Routes to tier_2.
+    criteria:
+      - copy edits, marketing tweaks, cosmetic UI adjustments
+      - non-breaking additions behind a flag
+      - internal refactors with no user-visible effect
+      - dependency bumps within a minor version, with tests green
+
+# --- TIER OVERRIDES ---
+# Applied AFTER goal.default_authority. Higher tier wins.
+# No hardcoded project names — the agent classifies by category.
+
+tier_overrides:
+  - match: touches_live_product_owned_by_me AND impact == substantial
+    force_tier: tier_3_explicit_green_light
+  - match: touches_live_product_owned_by_me AND impact == minor
+    force_tier: tier_2_propose_with_artifact
+  - match: touches_client_or_third_party_work
+    force_tier: tier_3_explicit_green_light
+  - match: publishes_public_content_under_my_name
+    force_tier: tier_3_explicit_green_light
+  - match: incurs_any_monetary_cost
+    force_tier: tier_3_explicit_green_light
+  - match: modifies_secrets_or_credentials
+    force_tier: tier_4_hard_stop
+  - match: creates_or_modifies_legal_or_financial_commitment
+    force_tier: tier_4_hard_stop
+
+# --- OUTPUT CONTRACT ---
+# Every action the stage 2 agent proposes MUST include these fields.
+# Actions that fail the contract are REJECTED WITH REASON — never
+# silently dropped. Rejections are logged so the pipeline is auditable
+# and I can spot systemic issues (e.g. stage 1 not producing the atom
+# types stage 2 expects).
+
+action_output_contract:
+
+  required_fields:
+    - goal_id
+    - relevance_score       # 0-3, per goal's scoring_rubric
+    - atoms_used            # list of atom_ids from stage 1 extraction
+    - action_description    # what will actually happen, in one paragraph
+    - proposed_tier         # from authority_tiers
+    - effort_estimate_hours # integer
+    - reversibility         # trivial | undo_able | hard | irreversible
+    - external_surface      # bool — does this touch anyone outside me?
+    - dependencies          # list of things outside agent's control
+    - impact_classification # required if touches a live product I own
+    - pre_check             # required if proposed_tier >= tier_3
+
+  rejection_rules:
+    # Each rule, when triggered, produces a structured rejection object
+    # with rule_id, reason, and suggested_next_step.
+
+    - rule_id: low_relevance
+      condition: relevance_score < 2
+      reason_template: >
+        Video did not surface atoms scoring >=2 against goal {goal_id}.
+        Applied atoms: {atoms_used}. Highest-scoring atom: {top_atom}.
+      suggested_next_step: skip_or_reprocess_stage_1
+
+    - rule_id: irreversible_without_hard_stop
+      condition: reversibility == irreversible AND proposed_tier != tier_4_hard_stop
+      reason_template: >
+        Action classified as irreversible but proposed at {proposed_tier}.
+        Irreversible actions require tier_4 or explicit human review of
+        the reversibility assessment.
+      suggested_next_step: escalate_to_human_for_reclassification
+
+    - rule_id: external_surface_at_auto_tier
+      condition: proposed_tier == tier_0_auto AND external_surface == true
+      reason_template: >
+        Action touches external surface ({external_surface_detail}) but
+        was proposed at tier_0_auto. Auto-tier is local-only.
+      suggested_next_step: bump_tier_and_repropose
+
+    - rule_id: missing_pre_check
+      condition: proposed_tier >= tier_3 AND pre_check == null
+      reason_template: >
+        Tier {proposed_tier} requires pre_check_block completion. Missing
+        pre-check indicates the agent could not answer one or more of the
+        required questions.
+      suggested_next_step: agent_completes_pre_check_or_drops_action
+
+    - rule_id: missing_impact_classification
+      condition: touches_live_product_owned_by_me == true AND impact_classification == null
+      reason_template: >
+        Action touches a live product owned by me but impact was not
+        classified. Cannot select correct tier without classification.
+      suggested_next_step: agent_classifies_impact_and_reproposes
+
+  rejection_output_format:
+    action_id: string
+    rule_id: string
+    reason: string          # populated from rule_id's reason_template
+    suggested_next_step: string
+    logged_at: timestamp
+
+# --- ATOM TYPE VOCABULARY ---
+# Closed set the stage 1 model must pick from. Adding new types here
+# is a deliberate act — don't widen it without re-checking goal
+# required_evidence constraints.
+
+atom_types:
+  - implementation_pattern
+  - framework
+  - org_pattern
+  - business_model
+  - revenue_pattern
+  - architecture
+  - tool_recipe
+  - concept
+
+# Atom evidence vocabulary
+atom_evidence:
+  - stated_practice    # speaker describes doing it themselves
+  - framework_claim    # speaker defines a taxonomy or framework
+  - anecdotal          # one-off example
+  - data               # cited numbers or measurable evidence

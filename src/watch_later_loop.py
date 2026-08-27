@@ -106,9 +106,33 @@ def _process_entry(entry: WatchLaterEntry, model: str):
     return True, None, result
 
 
-def _send_email(summary) -> tuple[bool, Optional[str], Optional[str]]:
+def _run_stage2(video_id: str, summary, verbose: bool = False) -> tuple[Optional[dict], Optional[str]]:
+    """Score the v2 extraction against goals.yaml. Returns (payload, error_message)."""
+    if (summary.prompt_version or "v1") != "v2":
+        return None, None
+    from src.stage2 import score_video, persist_stage2, load_goals
     try:
-        sent = gmail_sender.send_analysis_email(summary)
+        cfg = load_goals()
+    except Exception as e:
+        return None, f"goals.yaml load failed: {e}"
+    try:
+        s2 = score_video(
+            video_id=video_id,
+            extraction=summary.structured_output,
+            cfg=cfg,
+            verbose=verbose,
+        )
+        if s2.error:
+            return None, f"stage 2 error: {s2.error}"
+        persist_stage2(video_id, s2, prompt_version=summary.prompt_version)
+        return s2.to_dict(), None
+    except Exception as e:
+        return None, f"stage 2 crashed: {e}"
+
+
+def _send_email(summary, stage2_payload: Optional[dict] = None) -> tuple[bool, Optional[str], Optional[str]]:
+    try:
+        sent = gmail_sender.send_analysis_email(summary, stage2=stage2_payload)
         return True, None, sent.get("message_id")
     except Exception as e:
         return False, f"email send failed: {e}", None
@@ -165,7 +189,15 @@ def sync_once(model: str = DEFAULT_MODEL, limit: int = 25) -> SyncRunReport:
         db.mark_watch_later_processed(video_id)
         report.processed += 1
 
-        emailed, email_error, message_id = _send_email(summary)
+        stage2_payload = None
+        stage2_error = None
+        s2, stage2_error = _run_stage2(video_id, summary)
+        if stage2_error:
+            log.warning("Watch Later Stage 2 issue for %s: %s", video_id, stage2_error)
+            report.errors.append(f"{video_id}: stage2: {stage2_error}")
+        stage2_payload = s2
+
+        emailed, email_error, message_id = _send_email(summary, stage2_payload=stage2_payload)
         if emailed:
             db.mark_watch_later_emailed(video_id, message_id)
             report.emailed += 1

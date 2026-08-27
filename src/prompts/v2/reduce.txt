@@ -1,0 +1,109 @@
+You are synthesising the final structured extraction from many chunk-level extractions of a single video. This output is consumed by a downstream agent that scores it against a goals file and proposes actions. Optimise for the agent: preserve mechanisms, attach timestamps, dedupe across chunks.
+
+# Input
+
+Video title: {title}
+Channel: {channel}
+Duration: {duration}
+URL: {url}
+
+Chunk-level extractions (one JSON object per chunk, in order):
+{chunk_extractions}
+
+Transcript (with line-mapped timestamps where available):
+{transcript_with_timestamps}
+
+# Task
+
+Produce a single JSON object matching the schema below. STRICT JSON, no commentary, no markdown fences.
+
+# Output schema
+
+{{
+  "meta": {{
+    "title": "{title}",
+    "url": "{url}",
+    "channel": "{channel}",
+    "duration_seconds": <integer or null>,
+    "transcript_tokens": <approximate count, integer>
+  }},
+  "thesis": "one line, the through-line or main point of the video",
+  "transferable_atoms": [
+    {{
+      "id": "atom_01",
+      "label": "short noun phrase, 2-5 words",
+      "mechanism": "the actual reusable mechanism, preserving specifics. NOT a paraphrase. Example shape: 'Sub-agent model tiering: Haiku/Sonnet for sub-agents, Opus reserved for orchestrator — trades cost/latency for autonomy.' NOT: 'use cheaper models for simple tasks'.",
+      "type": "implementation_pattern|framework|org_pattern|business_model|revenue_pattern|architecture|tool_recipe|concept",
+      "evidence": "stated_practice|framework_claim|anecdotal|data",
+      "dependencies": ["prerequisite concept or tool, or empty list"],
+      "timestamp": "MM:SS-MM:SS"
+    }}
+  ],
+  "stack": [
+    {{"tool": "Name", "role": "what it does in the speaker's setup"}}
+  ],
+  "open_questions": [
+    "questions a viewer would naturally ask after this video, that the speaker did not fully answer"
+  ],
+  "markdown": "see layout below"
+}}
+
+# Atom rules
+
+- Atoms are the priority output. Aim for 3-8 atoms per video. If a video has no reusable mechanisms, return an empty list — do NOT manufacture atoms from vague advice.
+- Each atom must be referenceable: an agent picking it should know exactly what to look up in the transcript. If the mechanism can't be stated concretely with specifics, drop the atom.
+- IDs: atom_01, atom_02, atom_03, etc.
+- Type vocabulary (closed set): implementation_pattern, framework, org_pattern, business_model, revenue_pattern, architecture, tool_recipe, concept
+- Evidence vocabulary (closed set): stated_practice (speaker says they do it), framework_claim (speaker defines a taxonomy), anecdotal (one-off example), data (cited numbers)
+- Deduplicate across chunks. If chunk 2 and chunk 5 both surface the same atom, keep one with the merged timestamp range.
+- Dependencies: list of strings naming concepts/tools the atom relies on. Empty list if none.
+- timestamp: "MM:SS-MM:SS" using zero-padded MM and SS. Round down to whole seconds. Use chunk-level data to fill in ranges when possible; otherwise use the timestamp of the most specific claim/concept the atom came from.
+
+# Stack rules
+
+- Only name tools/systems the speaker actually mentions. No invented integrations.
+- "role" should describe how the tool was used in the speaker's setup, not a generic description. Example: "human-agent interface via 'Loop Alley' Slack channel" not "team chat".
+
+# Open questions rules
+
+- Things a thoughtful viewer would want to follow up on. NOT trivia. NOT things the speaker already answered.
+- 1-5 questions. Empty list if nothing worth flagging.
+
+# Markdown layout (human-readable summary)
+
+```
+# {{title}}
+
+**Channel:** {{channel}} | **URL:** {{url}} | **Duration:** {{duration}}
+
+## TL;DR
+<three sentences>
+
+## The Argument
+<2-4 sentences, or 'No single argument; this is a collection of tips.'>
+
+## Key Concepts
+- **Concept** — definition _(at MM:SS)_
+- ...
+
+## Actionable Takeaways
+### <category>
+- takeaway
+### <category>
+- takeaway
+
+## Claims to Verify
+- claim _(at MM:SS)_ — why this should be checked
+
+## Glossary
+- **Entity** (type) — _first mentioned at MM:SS_
+
+## Source
+Transcript analysed in {{n_chunks}} chunks. {{transcript_length}} characters.
+```
+
+# General rules
+
+- Be precise. Don't editorialize. Don't invent. Drop vague takeaways — only concrete ones.
+- Deduplicate concepts/claims across chunks: a concept introduced in chunk 2 and referenced in chunk 5 should appear once, with timestamp from chunk 2.
+- Length budget for `markdown`: readable in 60 seconds. Tight.

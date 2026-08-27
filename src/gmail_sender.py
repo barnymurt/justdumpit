@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+import json
 import logging
 import os
 import re
@@ -358,10 +359,99 @@ def _html_shell(body_html: str, footer: str) -> str:
     )
 
 
-def _build_email(result: SummaryResult, from_addr: str, to_addrs: list[str]) -> EmailMessage:
-    md = result.markdown or _fallback_markdown(result)
-    html_body = _md_to_html(md)
+def _stage2_brief(stage2: dict) -> tuple[str, int, bool]:
+    """Render the Stage 2 brief as markdown. Returns (markdown, max_relevance, low_relevance)."""
+    per_goal = stage2.get("per_goal", []) or []
+    if not per_goal:
+        return "", 0, False
+
+    max_rel = max((g.get("relevance", 0) for g in per_goal), default=0)
+    low_relevance = max_rel < 2
+
+    lines: list[str] = ["## Stage 2 — Action Brief", ""]
+    if low_relevance:
+        lines.append(f"_Max relevance across goals: {max_rel}/3. Low signal — included for transparency._")
+        lines.append("")
+    for g in per_goal:
+        rel = g.get("relevance", 0)
+        goal_id = g.get("goal_id", "?")
+        goal_name = g.get("goal_name", "")
+        lines.append(f"### {goal_name} (`{goal_id}`) — relevance {rel}/3")
+        actions = g.get("proposed_actions", []) or []
+        skip = g.get("skip_reason")
+        if not actions and skip:
+            lines.append(f"  - **Skip:** {skip}")
+        for a in actions:
+            tier = a.get("proposed_tier", "?")
+            effort = a.get("effort_estimate_hours", "?")
+            reversibility = a.get("reversibility", "?")
+            external = "yes" if a.get("external_surface") else "no"
+            atoms = ", ".join(a.get("atoms_used", []) or []) or "-"
+            lines.append(
+                f"  - **[{tier}]** effort ~{effort}h · reversibility={reversibility} · external={external} · atoms={atoms}"
+            )
+            lines.append(f"    {a.get('action_description', '')}")
+            if a.get("impact_classification"):
+                lines.append(f"    Impact: {a['impact_classification']}")
+            if a.get("pre_check"):
+                lines.append("    Pre-check:")
+                for q in a["pre_check"]:
+                    lines.append(f"      - {q}")
+        lines.append("")
+
+    rejections = stage2.get("rejections", []) or []
+    if rejections:
+        lines.append("### Rejections (audited, no actions dropped silently)")
+        for r in rejections:
+            lines.append(f"  - `{r.get('rule_id','?')}` on `{r.get('action_id','?')}` — {r.get('reason','')}")
+            lines.append(f"    Next: {r.get('suggested_next_step','')}")
+        lines.append("")
+    return "\n".join(lines), max_rel, low_relevance
+
+
+def _atoms_index(atoms: list[dict]) -> str:
+    if not atoms:
+        return ""
+    lines = ["## Atoms Index", ""]
+    for a in atoms:
+        label = a.get("label", "?")
+        ts = a.get("timestamp", "?")
+        atom_type = a.get("type", "?")
+        atom_id = a.get("id", "?")
+        lines.append(f"- `{atom_id}` **{label}** _{atom_type}_ @ {ts}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _build_email(
+    result: SummaryResult,
+    from_addr: str,
+    to_addrs: list[str],
+    stage2: Optional[dict] = None,
+) -> EmailMessage:
+    md_human = result.markdown or _fallback_markdown(result)
+
+    md_parts: list[str] = []
+    if stage2:
+        brief_md, max_rel, low_rel = _stage2_brief(stage2)
+        if brief_md:
+            md_parts.append(brief_md)
+        atoms_index = _atoms_index(getattr(result, "atoms", []) or [])
+        if atoms_index:
+            md_parts.append(atoms_index)
+    md_parts.append(md_human)
+
+    md_combined = "\n\n".join(md_parts)
+
+    html_body = _md_to_html(md_combined)
     model = getattr(result, "model", "") or ""
+    stage2_tag = ""
+    if stage2:
+        max_rel = max((g.get("relevance", 0) for g in (stage2.get("per_goal") or [])), default=0)
+        if max_rel < 2:
+            stage2_tag = " (low-relevance)"
+        else:
+            stage2_tag = f" [Stage2: {max_rel}/3]"
     footer = (
         f"justdumpit · video_id={result.video_id} · "
         f"prompt={result.prompt_version}"
@@ -370,12 +460,22 @@ def _build_email(result: SummaryResult, from_addr: str, to_addrs: list[str]) -> 
     html_doc = _html_shell(html_body, footer)
 
     msg = EmailMessage()
-    subject = f"[Watch Later] {result.channel_name or 'YouTube'} — {result.video_title}"
+    subject = f"[Watch Later] {result.channel_name or 'YouTube'} — {result.video_title}{stage2_tag}"
     msg["Subject"] = subject[:998]
     msg["From"] = formataddr(("justdumpit", from_addr))
     msg["To"] = ", ".join(to_addrs)
-    msg.set_content(md)
+    msg.set_content(md_combined)
     msg.add_alternative(html_doc, subtype="html")
+
+    if stage2:
+        attachment = json.dumps(stage2, indent=2, ensure_ascii=False).encode("utf-8")
+        msg.add_attachment(
+            attachment,
+            maintype="application",
+            subtype="json",
+            filename=f"stage2-{result.video_id}.json",
+        )
+
     return msg
 
 
@@ -397,14 +497,19 @@ def send_analysis_email(
     result: SummaryResult,
     to: Optional[list[str]] = None,
     from_addr: Optional[str] = None,
+    stage2: Optional[dict] = None,
 ) -> dict:
-    """Build and send the analysis email. Returns {message_id, thread_id, to}."""
+    """Build and send the analysis email. Returns {message_id, thread_id, to}.
+
+    If `stage2` is provided, the email includes the Stage 2 action brief,
+    the atoms index, and a JSON attachment with the full Stage 2 payload.
+    """
     if not result.success:
         raise ValueError(f"Refusing to email failed analysis: {result.error}")
 
     from_addr = from_addr or sender_address()
     to_addrs = to or recipients()
-    msg = _build_email(result, from_addr, to_addrs)
+    msg = _build_email(result, from_addr, to_addrs, stage2=stage2)
 
     service = _gmail_service()
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")

@@ -19,6 +19,7 @@ RUN pip install -r requirements.txt
 
 COPY src/ ./src/
 COPY scripts/ ./scripts/
+COPY config/ ./config/
 
 RUN mkdir -p /data
 

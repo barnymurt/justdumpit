@@ -1,6 +1,29 @@
-# YTTranscriptScraper
+# justdumpit (YTTranscriptScraper)
 
-A personal YouTube knowledge harvester. Take a video URL or follow a list of channels; the tool fetches transcripts, runs structured LLM extraction, and persists everything to a local SQLite knowledge base with semantic search over chunks. Designed to run on Oracle Cloud Always Free (free forever) so it's reachable from any device.
+A personal YouTube knowledge harvester that fetches transcripts, runs goal-conditioned LLM extraction, and emails you an **action brief** plus a **JSON attachment** your downstream agent can act on. Designed to run on Fly.io (cheap, persistent, reachable from anywhere) so the Watch Later pipeline can fire automatically.
+
+## Two-stage pipeline
+
+**Stage 1 — atom extraction (prompt v2, default).** Per video, extracts `transferable_atoms` (discrete referenceable mechanisms — "Haiku/Sonnet for sub-agents, Opus reserved for orchestrator", not paraphrased), `stack`, `open_questions`, `thesis`, plus the human-readable `markdown` summary. Goal-agnostic — you can change goals.yaml and re-score old videos without re-transcribing.
+
+**Stage 2 — goal-conditioned scoring.** Reads `config/goals.yaml` (3 goals: `dev_workflow`, `side_income`, `agent_run_business`), scores each goal 0-3 against the atoms, proposes concrete actions with authority tiers (`tier_0_auto` → `tier_4_hard_stop`). Skips are populated, not silently dropped. Rejections are audited.
+
+**Email output.** Subject prefixed with `[Stage2: N/3]`. Body has the action brief, atoms index, then your human summary. JSON attachment contains the full Stage 2 payload for your downstream agent to parse.
+
+The v1 prompt set (editorial summary only) still works via `--prompt-version v1`. Stage 2 only runs for v2.
+
+## What it does (Stage 1)
+
+For each video:
+
+1. **Acquire** — pulls the transcript via `youtube-transcript-api` (multi-language fallback)
+2. **Extract** — chunked map pass extracts claims/concepts/examples/actions/entities/atoms_precursors per chunk
+3. **Synthesise** — reduce pass produces `meta`, `thesis`, `transferable_atoms`, `stack`, `open_questions`, plus rendered `markdown`
+4. **Store** — videos, transcripts, analyses (keyed on prompt version), chunks with embeddings in SQLite
+5. **Stage 2** — atoms scored against `config/goals.yaml`, actions proposed with authority tiers, rejections audited
+6. **Email** — markdown body + JSON attachment to your Gmail
+
+For watched channels, RSS polling discovers new videos automatically every 6 hours. The Watch Later loop (separate, OAuth-based) checks your YouTube Watch Later playlist and runs the same pipeline.
 
 ## What it does
 

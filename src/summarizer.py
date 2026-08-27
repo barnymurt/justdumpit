@@ -22,8 +22,8 @@ class SummaryResult:
     channel_name: str
     summary: str
     key_points: list[str]
-    important_links: list[dict[str, str]]
-    timestamp_topics: list[dict[str, str]]
+    important_links: list[dict, str]
+    timestamp_topics: list[dict, str]
     transcript_length: int
     chunks_used: int
     success: bool
@@ -38,6 +38,11 @@ class SummaryResult:
     markdown: str = ""
     structured_output: dict = field(default_factory=dict)
     chunk_extractions: list[dict] = field(default_factory=list)
+    # v2 additions
+    atoms: list[dict] = field(default_factory=list)
+    stack: list[dict] = field(default_factory=list)
+    open_questions: list[str] = field(default_factory=list)
+    thesis: str = ""
 
 
 def _extract_json(content: str) -> Optional[dict]:
@@ -176,15 +181,40 @@ def summarize_transcript(
             time.sleep(0.5)
 
     reduce_template = prompts_pkg.load_prompt(pv, 'reduce')
-    reduce_prompt = reduce_template.format(
-        title=video_title,
-        channel=channel_name,
-        duration="unknown",
-        url=video_url,
-        n_chunks=total_chunks,
-        transcript_length=transcript_length,
-        chunk_extractions=json.dumps(chunk_extractions, ensure_ascii=False, indent=1)[:80000],
-    )
+
+    if pv == "v2":
+        ts_lines = []
+        for seg in (segments or [])[:3000]:
+            try:
+                ts = float(seg.get("start", 0.0))
+            except (TypeError, ValueError):
+                continue
+            text = (seg.get("text") or "").strip()
+            if not text:
+                continue
+            ts_lines.append(f"{_format_ts(ts)}  {text}")
+        transcript_with_timestamps = "\n".join(ts_lines)[:80000] or "(no timestamped segments available)"
+        reduce_kwargs = dict(
+            title=video_title,
+            channel=channel_name,
+            duration="unknown",
+            url=video_url,
+            n_chunks=total_chunks,
+            transcript_length=transcript_length,
+            chunk_extractions=json.dumps(chunk_extractions, ensure_ascii=False, indent=1)[:60000],
+            transcript_with_timestamps=transcript_with_timestamps,
+        )
+    else:
+        reduce_kwargs = dict(
+            title=video_title,
+            channel=channel_name,
+            duration="unknown",
+            url=video_url,
+            n_chunks=total_chunks,
+            transcript_length=transcript_length,
+            chunk_extractions=json.dumps(chunk_extractions, ensure_ascii=False, indent=1)[:80000],
+        )
+    reduce_prompt = reduce_template.format(**reduce_kwargs)
 
     if verbose:
         print(f"  Reduce pass...")
@@ -241,6 +271,12 @@ def summarize_transcript(
         for c in final['key_concepts']
     ]
 
+    atoms = final.get('transferable_atoms', []) or []
+    stack = final.get('stack', []) or []
+    open_questions = final.get('open_questions', []) or []
+    meta = final.get('meta', {}) or {}
+    thesis = final.get('thesis', '') or final.get('tldr', '')
+
     return SummaryResult(
         video_id=video_id,
         video_title=video_title,
@@ -263,6 +299,10 @@ def summarize_transcript(
         markdown=final.get('markdown', ''),
         structured_output=final,
         chunk_extractions=chunk_extractions,
+        atoms=atoms,
+        stack=stack,
+        open_questions=open_questions,
+        thesis=thesis,
     )
 
 

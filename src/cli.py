@@ -1,5 +1,7 @@
 import sys
 import typer
+import os
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -10,7 +12,7 @@ if hasattr(sys.stdout, "reconfigure"):
     except (ValueError, OSError):
         pass
 
-from src.config import get_output_dir, get_api_key, DEFAULT_MODEL, MAX_VIDEO_SELECT, get_backup_dir
+from src.config import get_output_dir, get_api_key, DEFAULT_MODEL, DEFAULT_PROMPT_VERSION, MAX_VIDEO_SELECT, get_backup_dir
 from src import db
 from src.channel import get_channel_videos, print_video_list
 from src.transcript import (
@@ -30,7 +32,7 @@ def _ensure_db() -> None:
 
 
 def _summary_to_db_payload(result: SummaryResult) -> dict:
-    return {
+    payload = {
         "summary": result.summary,
         "tldr": result.tldr,
         "argument": result.argument,
@@ -45,6 +47,19 @@ def _summary_to_db_payload(result: SummaryResult) -> dict:
         "error": result.error,
         "chunk_extractions": result.chunk_extractions,
     }
+    if (result.prompt_version or "v1") == "v2":
+        payload["transferable_atoms"] = result.atoms
+        payload["stack"] = result.stack
+        payload["open_questions"] = result.open_questions
+        payload["thesis"] = result.thesis
+        meta = result.structured_output.get("meta") if result.structured_output else None
+        if meta:
+            payload["meta"] = meta
+        for atom in result.atoms:
+            ts = atom.get("timestamp_seconds") or atom.get("timestamp")
+            if ts and "timestamp_seconds" not in atom:
+                atom["timestamp_seconds"] = ts
+    return payload
 
 
 def _store_embeddings(video_id: str, chunks: list[dict], verbose: bool = False) -> None:
@@ -71,6 +86,7 @@ def _process_single_video(
     verbose: bool,
     source: str,
     channel_id: Optional[str] = None,
+    prompt_version: Optional[str] = None,
 ) -> Optional[SummaryResult]:
     metadata = get_video_metadata(video_url, verbose=verbose)
     if not metadata.available:
@@ -106,6 +122,7 @@ def _process_single_video(
         video_id=transcript_result.video_id,
         model=model,
         verbose=verbose,
+        prompt_version=prompt_version,
         segments=transcript_result.segments,
     )
 
@@ -145,6 +162,7 @@ def _process_single_video(
             video_id=summary_result.video_id,
             output=output_payload,
             model=model,
+            prompt_version=summary_result.prompt_version,
             markdown=summary_result.markdown or (md_path.read_text(encoding='utf-8') if md_path.exists() else None),
             tldr=summary_result.tldr or summary_result.summary,
         )
@@ -159,9 +177,23 @@ def analyse(
     video_url: str = typer.Argument(..., help="YouTube video URL or video ID"),
     output_dir: Optional[Path] = typer.Option(None, "--output-dir", "-o"),
     model: str = typer.Option(DEFAULT_MODEL, "--model", "-m"),
+    prompt_version: str = typer.Option(
+        DEFAULT_PROMPT_VERSION,
+        "--prompt-version",
+        "-p",
+        help="Prompt version: v1 (legacy editorial) or v2 (atoms + Stage 2)",
+    ),
+    no_stage2: bool = typer.Option(False, "--no-stage2", help="Skip Stage 2 (atoms only)"),
+    send_email_flag: bool = typer.Option(
+        False, "--send-email", help="Email the analysis after Stage 2"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ):
-    """Run the full pipeline on a single YouTube URL and persist to the knowledge base."""
+    """Run the full pipeline on a single YouTube URL and persist to the knowledge base.
+
+    Default: v2 prompt + Stage 2 goal-conditioned scoring. Use --prompt-version v1
+    for the legacy editorial summary, or --no-stage2 to skip the action brief.
+    """
     _ensure_db()
 
     try:
@@ -177,7 +209,7 @@ def analyse(
         video_id = get_video_id(video_url)
         video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    typer.echo(f"Analyse: {video_url}")
+    typer.echo(f"Analyse: {video_url}  (prompt={prompt_version})")
 
     result = _process_single_video(
         video_url=video_url,
@@ -186,12 +218,42 @@ def analyse(
         output_path=output_path,
         verbose=verbose,
         source="manual",
+        prompt_version=prompt_version,
     )
 
     if result is None:
         raise typer.Exit(1)
     if not result.success:
         raise typer.Exit(2)
+
+    stage2_payload = None
+    if not no_stage2 and prompt_version == "v2":
+        from src.stage2 import score_video, persist_stage2, load_goals
+        try:
+            cfg = load_goals()
+            s2 = score_video(
+                video_id=result.video_id,
+                extraction=result.structured_output,
+                cfg=cfg,
+                model=model,
+                verbose=verbose,
+            )
+            stage2_payload = s2.to_dict()
+            persist_stage2(result.video_id, s2, prompt_version=prompt_version)
+            typer.echo(f"  Stage 2: max relevance {max((g.get('relevance', 0) for g in (stage2_payload.get('per_goal') or [])), default=0)}/3")
+        except Exception as e:
+            typer.echo(f"  [WARN] Stage 2 failed (continuing): {e}", err=True)
+
+    if send_email_flag:
+        from src import gmail_sender
+        try:
+            sent = gmail_sender.send_analysis_email(
+                result,
+                stage2=stage2_payload,
+            )
+            typer.echo(f"  [EMAIL] {sent['message_id']}")
+        except Exception as e:
+            typer.echo(f"  [EMAIL-FAIL] {e}", err=True)
 
     print_summary_result(result)
 
@@ -581,6 +643,107 @@ def watch_later_list_cmd(
         typer.echo(f"  [{marker}] {r['video_id']}  {title}")
         if r.get("last_error"):
             typer.echo(f"          error: {r['last_error'][:80]}")
+
+
+@app.command(name="goals-validate")
+def goals_validate_cmd(
+    config: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to goals.yaml (default: search standard locations)"
+    ),
+):
+    """Validate goals.yaml against the schema. Fails loud on bad config."""
+    from src.goals import load_goals
+    try:
+        cfg = load_goals(config)
+    except (FileNotFoundError, ValueError) as e:
+        typer.echo(f"FAIL: {e}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"OK goals.yaml v{cfg.version} owner={cfg.owner} last_reviewed={cfg.last_reviewed}")
+    typer.echo(f"  goals: {len(cfg.goals)}")
+    for g in cfg.goals:
+        typer.echo(
+            f"    - {g.id:25s} priority={g.priority} auth={g.default_authority} "
+            f"rubric={sorted(g.scoring_rubric.keys())} "
+            f"required_evidence={g.constraints.required_evidence or '-'}"
+        )
+    typer.echo(f"  authority_tiers: {cfg.authority_tier_keys}")
+    typer.echo(f"  atom_types: {len(cfg.atom_types)}")
+    typer.echo(f"  atom_evidence: {len(cfg.atom_evidence)}")
+    typer.echo(f"  tier_overrides: {len(cfg.tier_overrides)}")
+    typer.echo(f"  required_action_fields: {len(cfg.output_contract.required_fields)}")
+    typer.echo(f"  rejection_rules: {len(cfg.output_contract.rejection_rule_ids)}")
+
+
+@app.command(name="stage2")
+def stage2_cmd(
+    video_id: str = typer.Argument(..., help="Video ID (11 chars) to re-score with current goals.yaml"),
+    prompt_version: str = typer.Option(DEFAULT_PROMPT_VERSION, "--prompt-version", "-p"),
+    send_email_flag: bool = typer.Option(False, "--send-email", help="Email the action brief"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+):
+    """Re-run Stage 2 against an existing v2 extraction using the current goals.yaml.
+
+    Useful when goals.yaml changes and you want to re-score historical videos
+    without re-transcribing.
+    """
+    _ensure_db()
+
+    from src.stage2 import score_video, persist_stage2, load_goals
+    from src import db
+
+    extraction_row = db.get_analysis(video_id, prompt_version=prompt_version)
+    if not extraction_row:
+        typer.echo(f"No {prompt_version} analysis stored for {video_id}. Run `analyse --prompt-version {prompt_version}` first.", err=True)
+        raise typer.Exit(1)
+    extraction = extraction_row.get("output", {})
+    if not extraction.get("transferable_atoms"):
+        typer.echo(f"Stored {prompt_version} analysis has no transferable_atoms. Re-run analyse to produce a v2 extraction.", err=True)
+        raise typer.Exit(1)
+
+    cfg = load_goals()
+    s2 = score_video(video_id=video_id, extraction=extraction, cfg=cfg, verbose=verbose)
+    persist_stage2(video_id, s2, prompt_version=prompt_version)
+
+    payload = s2.to_dict()
+    max_rel = max((g.get("relevance", 0) for g in (payload.get("per_goal") or [])), default=0)
+    typer.echo(f"video_id={video_id} max_relevance={max_rel}/3")
+    for g in (payload.get("per_goal") or []):
+        n_actions = len(g.get("proposed_actions") or [])
+        if n_actions:
+            typer.echo(f"  {g['goal_id']:25s} relevance={g['relevance']}  actions={n_actions}")
+        else:
+            typer.echo(f"  {g['goal_id']:25s} relevance={g['relevance']}  skip={g.get('skip_reason') or 'no actions shaped'}")
+    n_rej = len(payload.get("rejections") or [])
+    if n_rej:
+        typer.echo(f"  rejections={n_rej} (see full JSON via `watch-later/entries` API or DB)")
+
+    if send_email_flag:
+        from src.summarizer import SummaryResult
+        result = SummaryResult(
+            video_id=video_id,
+            video_title=extraction.get("meta", {}).get("title", ""),
+            video_url=extraction.get("meta", {}).get("url", ""),
+            channel_name=extraction.get("meta", {}).get("channel", ""),
+            summary=extraction.get("tldr", ""),
+            key_points=[],
+            important_links=[],
+            timestamp_topics=[],
+            transcript_length=0,
+            chunks_used=0,
+            success=True,
+            prompt_version=prompt_version,
+            tldr=extraction.get("tldr", ""),
+            argument=extraction.get("argument", ""),
+            markdown=extraction.get("markdown", ""),
+            structured_output=extraction,
+            atoms=extraction.get("transferable_atoms", []) or [],
+            stack=extraction.get("stack", []) or [],
+            open_questions=extraction.get("open_questions", []) or [],
+            thesis=extraction.get("thesis", ""),
+        )
+        from src import gmail_sender
+        sent = gmail_sender.send_analysis_email(result, stage2=payload)
+        typer.echo(f"  [EMAIL] {sent['message_id']}")
 
 
 def _parse_video_selection(videos_str: Optional[str], max_videos: int) -> list[int]:

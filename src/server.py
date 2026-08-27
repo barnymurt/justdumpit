@@ -177,6 +177,87 @@ def get_video_transcript(video_id: str):
     }
 
 
+@app.get("/video/{video_id}/transcript/range")
+def get_transcript_range_endpoint(
+    video_id: str,
+    start: float = 0.0,
+    end: float = 99999.0,
+):
+    """Return transcript segments within [start, end] seconds.
+
+    Used by the downstream action-agent to fetch just the timestamp range
+    referenced by an atom, instead of loading the full transcript.
+    """
+    if start < 0 or end < start:
+        raise HTTPException(status_code=400, detail="start must be >= 0 and <= end")
+    result = db.get_transcript_range(video_id, start, end)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No transcript stored for this video")
+    return result
+
+
+@app.post("/watch-later/score")
+def watch_later_score_endpoint(
+    video_id: str,
+    prompt_version: str = "v2",
+    send_email_flag: bool = False,
+):
+    """Re-run Stage 2 against a stored v2 extraction using current goals.yaml."""
+    from src.stage2 import score_video, persist_stage2, load_goals
+
+    extraction_row = db.get_analysis(video_id, prompt_version=prompt_version)
+    if not extraction_row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {prompt_version} analysis stored for {video_id}",
+        )
+    extraction = extraction_row.get("output", {})
+    if not extraction.get("transferable_atoms"):
+        raise HTTPException(
+            status_code=400,
+            detail="Stored extraction has no transferable_atoms",
+        )
+
+    cfg = load_goals()
+    s2 = score_video(video_id=video_id, extraction=extraction, cfg=cfg)
+    persist_stage2(video_id, s2, prompt_version=prompt_version)
+    payload = s2.to_dict()
+
+    if send_email_flag:
+        from src.summarizer import SummaryResult
+        result = SummaryResult(
+            video_id=video_id,
+            video_title=extraction.get("meta", {}).get("title", ""),
+            video_url=extraction.get("meta", {}).get("url", ""),
+            channel_name=extraction.get("meta", {}).get("channel", ""),
+            summary=extraction.get("tldr", ""),
+            key_points=[],
+            important_links=[],
+            timestamp_topics=[],
+            transcript_length=0,
+            chunks_used=0,
+            success=True,
+            prompt_version=prompt_version,
+            tldr=extraction.get("tldr", ""),
+            argument=extraction.get("argument", ""),
+            markdown=extraction.get("markdown", ""),
+            structured_output=extraction,
+            atoms=extraction.get("transferable_atoms", []) or [],
+            stack=extraction.get("stack", []) or [],
+            open_questions=extraction.get("open_questions", []) or [],
+            thesis=extraction.get("thesis", ""),
+        )
+        try:
+            get_api_key()
+        except ValueError as e:
+            raise HTTPException(status_code=503, detail=str(e))
+        from src import gmail_sender
+        sent = gmail_sender.send_analysis_email(result, stage2=payload)
+        payload["email_message_id"] = sent["message_id"]
+
+    return payload
+
+
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1)
     k: int = Field(10, ge=1, le=50)

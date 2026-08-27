@@ -51,5 +51,6 @@ def get_backup_dir() -> Path:
 
 
 DEFAULT_MODEL = "MiniMax-M2.5"
+DEFAULT_PROMPT_VERSION = "v2"
 MAX_CHUNK_SIZE = 50000
 MAX_VIDEO_SELECT = 5

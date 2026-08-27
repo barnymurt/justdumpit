@@ -96,6 +96,8 @@ def init_db(db_path: Optional[Path] = None) -> Path:
         conn.executescript(schema_sql)
         conn.commit()
 
+    ensure_stage2_column()
+
     return db_path
 
 
@@ -247,6 +249,7 @@ def upsert_analysis(
     prompt_version: Optional[str] = None,
     markdown: Optional[str] = None,
     tldr: Optional[str] = None,
+    stage2_output: Optional[str] = None,
 ) -> None:
     prompt_version = prompt_version or CURRENT_PROMPT_VERSION
     output_json = json.dumps(output, ensure_ascii=False)
@@ -255,16 +258,17 @@ def upsert_analysis(
             """
             INSERT INTO analyses (
                 video_id, prompt_version, model, output_json,
-                markdown, tldr, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                markdown, tldr, stage2_output, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(video_id, prompt_version) DO UPDATE SET
                 model = excluded.model,
                 output_json = excluded.output_json,
                 markdown = excluded.markdown,
                 tldr = excluded.tldr,
+                stage2_output = COALESCE(excluded.stage2_output, analyses.stage2_output),
                 created_at = excluded.created_at
             """,
-            (video_id, prompt_version, model, output_json, markdown, tldr, now_iso()),
+            (video_id, prompt_version, model, output_json, markdown, tldr, stage2_output, now_iso()),
         )
 
 
@@ -598,3 +602,124 @@ def watch_later_stats() -> dict:
         "pending": total - processed,
         "last_processed_at": last_processed,
     }
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 (goal-conditioned scoring) persistence
+# ---------------------------------------------------------------------------
+
+
+def upsert_stage2_output(video_id: str, prompt_version: str, payload: dict) -> None:
+    """Idempotently attach Stage 2 JSON to the existing analyses row.
+
+    Doesn't touch output_json / markdown / tldr / created_at — Stage 2 is a
+    derived, re-runnable view over the same extraction.
+    """
+    blob = json.dumps(payload, ensure_ascii=False)
+    with connect() as conn:
+        existing = conn.execute(
+            "SELECT 1 FROM analyses WHERE video_id = ? AND prompt_version = ?",
+            (video_id, prompt_version),
+        ).fetchone()
+        if existing is None:
+            conn.execute(
+                """
+                INSERT INTO analyses (
+                    video_id, prompt_version, model, output_json,
+                    markdown, tldr, stage2_output, created_at
+                ) VALUES (?, ?, '', '{}', NULL, NULL, ?, ?)
+                """,
+                (video_id, prompt_version, blob, now_iso()),
+            )
+        else:
+            conn.execute(
+                "UPDATE analyses SET stage2_output = ? WHERE video_id = ? AND prompt_version = ?",
+                (blob, video_id, prompt_version),
+            )
+
+
+def get_stage2_output(video_id: str, prompt_version: Optional[str] = None) -> Optional[dict]:
+    pv = prompt_version or CURRENT_PROMPT_VERSION
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT stage2_output FROM analyses WHERE video_id = ? AND prompt_version = ?",
+            (video_id, pv),
+        ).fetchone()
+        if not row or not row["stage2_output"]:
+            return None
+        try:
+            return json.loads(row["stage2_output"])
+        except json.JSONDecodeError:
+            return None
+
+
+def clear_stage2_output(video_id: str, prompt_version: Optional[str] = None) -> None:
+    pv = prompt_version or CURRENT_PROMPT_VERSION
+    with connect() as conn:
+        conn.execute(
+            "UPDATE analyses SET stage2_output = NULL WHERE video_id = ? AND prompt_version = ?",
+            (video_id, pv),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Transcript range retrieval
+# ---------------------------------------------------------------------------
+
+
+def get_transcript_range(video_id: str, start: float, end: float) -> Optional[dict]:
+    """Return segments from the stored transcript that fall within [start, end].
+
+    start/end are seconds. Returns None if no transcript stored. Empty list
+    of segments is valid (transcript exists but no segments in range).
+    """
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT segments_json FROM transcripts WHERE video_id = ?",
+            (video_id,),
+        ).fetchone()
+        if not row or not row["segments_json"]:
+            return None
+        try:
+            all_segments = json.loads(row["segments_json"])
+        except json.JSONDecodeError:
+            return None
+
+        matched: list[dict] = []
+        for seg in all_segments:
+            try:
+                seg_start = float(seg.get("start", 0.0))
+            except (TypeError, ValueError):
+                continue
+            seg_end = seg_start + float(seg.get("duration", 0.0) or 0.0)
+            if seg_end >= start and seg_start <= end:
+                matched.append({
+                    "start": seg_start,
+                    "duration": float(seg.get("duration", 0.0) or 0.0),
+                    "text": seg.get("text", ""),
+                })
+
+        return {
+            "video_id": video_id,
+            "start": start,
+            "end": end,
+            "segments": matched,
+            "segment_count": len(matched),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Schema migration helper — adds stage2_output column to existing analyses tables
+# ---------------------------------------------------------------------------
+
+
+def ensure_stage2_column() -> None:
+    """Add stage2_output column to analyses if it doesn't already exist.
+
+    The schema.sql uses CREATE TABLE IF NOT EXISTS which won't add columns
+    to an existing analyses table. This function patches legacy DBs on startup.
+    """
+    with connect() as conn:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(analyses)").fetchall()]
+        if "stage2_output" not in cols:
+            conn.execute("ALTER TABLE analyses ADD COLUMN stage2_output TEXT")

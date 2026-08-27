@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS analyses (
     output_json TEXT NOT NULL,
     markdown TEXT,
     tldr TEXT,
+    stage2_output TEXT,
     created_at TEXT NOT NULL,
     PRIMARY KEY (video_id, prompt_version),
     FOREIGN KEY (video_id) REFERENCES videos(video_id)

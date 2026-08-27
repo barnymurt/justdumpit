@@ -13,7 +13,12 @@ from src.config import get_data_dir
 log = logging.getLogger(__name__)
 
 
-YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube"
+YOUTUBE_SCOPES = [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/youtube",
+]
+YOUTUBE_LOGIN_HINT = os.getenv("YOUTUBE_LOGIN_HINT", "").strip()
 
 WATCH_LATER_PLAYLIST_ID = "WL"
 
@@ -79,7 +84,7 @@ def run_local_auth(headless: bool = False) -> Path:
 
     flow = InstalledAppFlow.from_client_config(
         _client_config(),
-        scopes=[YOUTUBE_READONLY_SCOPE],
+        scopes=YOUTUBE_SCOPES,
         autogenerate_code_verifier=True,
     )
 
@@ -140,9 +145,15 @@ def run_local_auth(headless: bool = False) -> Path:
             thread = _threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
 
-            auth_url, _ = flow.authorization_url(
-                prompt="select_account consent", access_type="offline", include_granted_scopes="false"
-            )
+            extra_url_params: dict[str, str] = {
+                "prompt": "select_account consent",
+                "access_type": "offline",
+                "include_granted_scopes": "false",
+            }
+            if YOUTUBE_LOGIN_HINT:
+                extra_url_params["login_hint"] = YOUTUBE_LOGIN_HINT
+
+            auth_url, _ = flow.authorization_url(**extra_url_params)
             print("\nOpen this URL in ANY browser, sign in, and grant access:\n")
             print(auth_url, flush=True)
             print(f"\nListening on http://127.0.0.1:{port} for the callback...", flush=True)
@@ -182,7 +193,7 @@ def _load_credentials():
             f"Run: python -m src.cli watch-later-auth"
         )
 
-    creds = Credentials.from_authorized_user_file(str(token_path), [YOUTUBE_READONLY_SCOPE])
+    creds = Credentials.from_authorized_user_file(str(token_path), YOUTUBE_SCOPES)
 
     if creds.expired and creds.refresh_token:
         try:
