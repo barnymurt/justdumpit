@@ -380,16 +380,25 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _validate_action(action: ProposedAction, cfg: GoalsConfig, log: list[Rejection]) -> bool:
-    """Apply rejection_rules from goals.yaml. Returns True if action passes."""
+def _validate_action(
+    action: ProposedAction,
+    cfg: GoalsConfig,
+    log: list[Rejection],
+    goal_relevance: int,
+) -> bool:
+    """Apply rejection_rules from goals.yaml. Returns True if action passes.
+
+    Relevance is the GOAL-level score (the model sometimes echoes relevance_score
+    into each action; that's noise, not the source of truth).
+    """
     aid = f"{action.goal_id}:{action.atoms_used[0] if action.atoms_used else 'no_atoms'}"
     now = _now_iso()
 
-    if action.relevance_score < 2:
+    if goal_relevance < 2:
         log.append(Rejection(
             action_id=aid,
             rule_id="low_relevance",
-            reason=f"goal {action.goal_id}: relevance {action.relevance_score} < 2",
+            reason=f"goal {action.goal_id}: relevance {goal_relevance} < 2",
             suggested_next_step="skip_or_reprocess_stage_1",
             logged_at=now,
         ))
@@ -622,7 +631,7 @@ def score_video(
                 if not isinstance(raw_action, dict):
                     continue
                 action = _parse_action(raw_action, gid)
-                if _validate_action(action, cfg, rejections):
+                if _validate_action(action, cfg, rejections, goal_relevance=relevance):
                     proposed.append(action)
 
         per_goal.append(GoalResult(
