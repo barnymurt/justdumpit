@@ -323,7 +323,7 @@ def _call_minimax_api(api_key: str, model: str, prompt: str, verbose: bool, max_
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.4,
+        "temperature": 0.0,
     }
 
     for attempt in range(max_retries):

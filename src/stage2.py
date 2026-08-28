@@ -254,6 +254,12 @@ def _build_prompt(extraction: dict, cfg: GoalsConfig) -> str:
             f"      {score}: {desc.strip()}"
             for score, desc in sorted(g.scoring_rubric.items(), reverse=True)
         )
+        rubric_min_score = 2
+        rubric_max_score = 3
+        for s, _ in g.scoring_rubric.items():
+            if int(s) >= 2:
+                rubric_min_score = min(rubric_min_score, int(s))
+            rubric_max_score = max(rubric_max_score, int(s))
         applies = "; ".join(g.applies_to) or "(none specified)"
         excludes = "; ".join(g.excludes) or "(none specified)"
         req = g.constraints.required_evidence or "(none)"
@@ -293,6 +299,39 @@ stack:
 The operator has these goals (in priority order). Score each one:
 
 {goals_block}
+
+# Anti-conservatism guidance (READ THIS CAREFULLY)
+
+The operator is running a multi-goal pipeline and the email/Slack/inbox cost of
+relevance=0 on a clearly-relevant video is HIGH. Apply the rubric aggressively:
+
+- If the atoms CONTAIN concrete business models, revenue mechanisms, or agent
+  architectures that match the goal's scope, the relevance is AT LEAST 2 — not 0 or 1.
+- A speculative business model (speaker says "you could do X") still counts
+  toward agent_run_business if X is a real pattern. The constraint "<10h to test"
+  on side_income is for the *operator's testability*, not for whether the speaker
+  demonstrated a model.
+- The required_evidence constraint (e.g., "at_least_one_atom_of_type[business_model]")
+  is a HARD GATE: if atoms of those types exist, the goal is in scope, and you must
+  score 2+. Use 1 only when no atoms of required types exist AND the atoms are
+  purely tangential. Use 0 only when the video is wholly off-topic.
+- A "3" should be the DEFAULT for videos where the speaker articulates specific
+  revenue numbers, concrete architectures, or named tools/workflows. Reserve
+  "1" and "0" for videos that don't mention anything in scope.
+
+Common scoring failures to AVOID:
+- Giving a video relevance=1 just because "the operator hasn't done it yet" — the
+  rubric explicitly says new sectors score as high as familiar ones.
+- Giving relevance=1 because "this requires client acquisition" — that's effort,
+  not relevance.
+- Echoing relevance_score:0 inside each proposed_action. relevance_score is
+  GOAL-LEVEL only. Once per goal entry. NEVER inside an action.
+
+HARD CONSTRAINT: If the goal's `required_evidence` is satisfied by atoms in the
+extraction (e.g., the goal requires "at_least_one_atom_of_type[business_model]" and
+the atoms contain a `business_model` entry), the relevance MUST be >= 2. This is
+not a suggestion — it's a structural rule. Skip the goal (relevance < 2) ONLY
+when no atoms of the required types are present.
 
 # Authority tiers
 
