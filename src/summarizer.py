@@ -142,12 +142,15 @@ def _extract_stack_from_markdown(md: str) -> list[dict]:
         return []
     items: list[dict] = []
     for line in body.splitlines():
-        m = re.match(r"^[*-]\s*(?:`([^`]+)`|([^:]+))\s*:\s*(.+)$", line.strip())
+        m = re.match(
+            r"^[*-]\s*(?:`([^`]+)`|([^\s—–-]+))\s*(?:[:—–-])\s*(.+)$",
+            line.strip(),
+        )
         if not m:
             continue
-        tool = (m.group(1) or m.group(2) or "").strip()
+        tool = (m.group(1) or m.group(2) or "").strip().strip("`")
         role = m.group(3).strip()
-        if not tool:
+        if not tool or tool == role:
             continue
         items.append({"tool": tool[:200], "role": role[:300]})
     return items
