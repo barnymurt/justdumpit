@@ -383,3 +383,53 @@ def watch_later_entries_endpoint(
         else db.list_watch_later_entries(limit=limit)
     )
     return {"entries": rows}
+
+
+@app.get("/video/{video_id}/stage2")
+def get_video_stage2_endpoint(video_id: str, prompt_version: str = "v2"):
+    """Return the stored Stage 2 output for a video. Used by justdumpit-agent."""
+    s2 = db.get_stage2_output(video_id, prompt_version)
+    if s2 is None:
+        raise HTTPException(status_code=404, detail="no Stage 2 output for this video")
+    extraction = db.get_analysis(video_id, prompt_version=prompt_version)
+    return {
+        "video_id": video_id,
+        "prompt_version": prompt_version,
+        "stage2": s2,
+        "extraction": (extraction or {}).get("output", {}),
+    }
+
+
+@app.get("/goals")
+def get_goals_endpoint():
+    """Return the parsed GoalsConfig as JSON. Single source of truth for
+    justdumpit-agent's goal validation."""
+    from src.goals import load_goals
+    try:
+        cfg = load_goals()
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=500, detail=f"goals.yaml load failed: {e}")
+    return {
+        "version": cfg.version,
+        "owner": cfg.owner,
+        "last_reviewed": cfg.last_reviewed,
+        "goals": [
+            {
+                "id": g.id,
+                "name": g.name,
+                "priority": g.priority,
+                "description": g.description,
+                "scoring_rubric": g.scoring_rubric,
+                "constraints": {
+                    "required_evidence": g.constraints.required_evidence,
+                    "max_effort_per_action_hours": g.constraints.max_effort_per_action_hours,
+                    "exploration_bonus": g.constraints.exploration_bonus,
+                },
+                "default_authority": g.default_authority,
+            }
+            for g in cfg.goals
+        ],
+        "authority_tier_keys": cfg.authority_tier_keys,
+        "atom_types": cfg.atom_types,
+        "atom_evidence": cfg.atom_evidence,
+    }

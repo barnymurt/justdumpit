@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
+
+import httpx
 
 from src import db
 from src.config import DEFAULT_MODEL, get_output_dir
@@ -132,10 +135,64 @@ def _run_stage2(video_id: str, summary, verbose: bool = False) -> tuple[Optional
 
 def _send_email(summary, stage2_payload: Optional[dict] = None) -> tuple[bool, Optional[str], Optional[str]]:
     try:
-        sent = gmail_sender.send_analysis_email(summary, stage2=stage2_payload)
+        sent = gmail_sender.send_analysis_email(summary, stage=stage2_payload)
         return True, None, sent.get("message_id")
     except Exception as e:
         return False, f"email send failed: {e}", None
+
+
+def _fire_agent_webhook(video_id: str, video_url: str, stage2_payload: Optional[dict], source: str) -> None:
+    """Notify justdumpit-agent of a new Stage 2 output (if max relevance >= 2).
+
+    No-op if AGENT_WEBHOOK_URL is not set (so existing deployments don't break).
+    Failures are logged but never block the watch-later pipeline.
+    """
+    agent_url = os.getenv("AGENT_WEBHOOK_URL", "").strip()
+    if not agent_url:
+        return
+    if not stage2_payload:
+        return
+    max_rel = max(
+        (g.get("relevance", 0) for g in (stage2_payload.get("per_goal") or [])),
+        default=0,
+    )
+    if max_rel < 2:
+        log.info(
+            "Watch Later: skipping agent webhook for %s (max_relevance=%d < 2)",
+            video_id, max_rel,
+        )
+        return
+
+    headers = {"Content-Type": "application/json"}
+    token = os.getenv("AGENT_WEBHOOK_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    payload = {
+        "video_id": video_id,
+        "video_url": video_url,
+        "stage2": stage2_payload,
+        "source": source,
+    }
+    try:
+        r = httpx.post(
+            agent_url,
+            headers=headers,
+            json=payload,
+            timeout=10.0,
+        )
+        if r.status_code >= 400:
+            log.warning(
+                "Watch Later: agent webhook %s returned %d: %s",
+                agent_url, r.status_code, r.text[:200],
+            )
+        else:
+            log.info(
+                "Watch Later: agent webhook fired for %s (max_relevance=%d)",
+                video_id, max_rel,
+            )
+    except Exception as e:
+        log.warning("Watch Later: agent webhook failed for %s: %s", video_id, e)
 
 
 def sync_once(model: str = DEFAULT_MODEL, limit: int = 25) -> SyncRunReport:
@@ -213,6 +270,13 @@ def sync_once(model: str = DEFAULT_MODEL, limit: int = 25) -> SyncRunReport:
             report.errors.append(f"{video_id}: email: {email_error}")
             db.mark_watch_later_failed(video_id, email_error or "email failed")
             log.warning("Watch Later email failed for %s: %s", video_id, email_error)
+
+        _fire_agent_webhook(
+            video_id=video_id,
+            video_url=entry.url,
+            stage2_payload=stage2_payload,
+            source="watch-later",
+        )
 
     report.finished_at = _now_iso()
     log.info(
