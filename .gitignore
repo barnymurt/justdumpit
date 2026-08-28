@@ -45,3 +45,9 @@ wl_*.err
 # OS
 .DS_Store
 Thumbs.db
+
+# Temp test artifacts
+*.json.tmp
+webhook_result.json
+webmcp_result.json
+webmcp_s2.json
