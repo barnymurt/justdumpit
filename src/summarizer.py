@@ -71,6 +71,112 @@ def _extract_json(content: str) -> Optional[dict]:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Markdown fallback extractors (v2 reduce prompt sometimes puts atoms inside
+# the markdown field instead of as top-level JSON fields)
+# ---------------------------------------------------------------------------
+
+
+_ATOM_LINE_RE = re.compile(
+    r"^[*-]\s*`?(atom_\d+)`?\s*[—–-]\s*(.+?)(?:\s*@\s*([0-9:]+(?:\s*-\s*[0-9:]+)?))?\s*$",
+    re.MULTILINE,
+)
+_ATOM_TYPES = {
+    "implementation_pattern", "framework", "org_pattern", "business_model",
+    "revenue_pattern", "architecture", "tool_recipe", "concept",
+}
+_EVIDENCE_TYPES = {"stated_practice", "framework_claim", "anecdotal", "data"}
+
+
+def _split_md_sections(md: str) -> dict[str, str]:
+    """Return markdown split into sections keyed by '## Atoms', '## Stack', etc."""
+    out: dict[str, str] = {}
+    current = ""
+    current_key = "_preamble"
+    for line in md.splitlines():
+        h = re.match(r"^##\s+(.+?)\s*$", line)
+        if h:
+            out[current_key] = current
+            current_key = h.group(1).strip().lower()
+            current = ""
+        else:
+            current += line + "\n"
+    out[current_key] = current
+    return out
+
+
+def _extract_atoms_from_markdown(md: str) -> list[dict]:
+    if not md:
+        return []
+    sections = _split_md_sections(md)
+    body = sections.get("atoms", "")
+    if not body.strip():
+        return []
+    atoms: list[dict] = []
+    idx = 0
+    for m in _ATOM_LINE_RE.finditer(body):
+        atom_id, label, ts = m.group(1), m.group(2).strip(), (m.group(3) or "").strip()
+        label = re.sub(r"^`+|`+$", "", label).strip()
+        if not label:
+            continue
+        idx += 1
+        atom = {
+            "id": atom_id,
+            "label": label[:200],
+            "mechanism": label,
+            "type": "concept",
+            "evidence": "anecdotal",
+            "dependencies": [],
+            "timestamp": ts or "",
+        }
+        atoms.append(atom)
+    return atoms
+
+
+def _extract_stack_from_markdown(md: str) -> list[dict]:
+    if not md:
+        return []
+    sections = _split_md_sections(md)
+    body = sections.get("stack", "")
+    if not body.strip():
+        return []
+    items: list[dict] = []
+    for line in body.splitlines():
+        m = re.match(r"^[*-]\s*(?:`([^`]+)`|([^:]+))\s*:\s*(.+)$", line.strip())
+        if not m:
+            continue
+        tool = (m.group(1) or m.group(2) or "").strip()
+        role = m.group(3).strip()
+        if not tool:
+            continue
+        items.append({"tool": tool[:200], "role": role[:300]})
+    return items
+
+
+def _extract_open_questions_from_markdown(md: str) -> list[str]:
+    if not md:
+        return []
+    sections = _split_md_sections(md)
+    body = sections.get("open questions", "")
+    if not body.strip():
+        return []
+    out: list[str] = []
+    for line in body.splitlines():
+        m = re.match(r"^[*-]\s*(.+)$", line.strip())
+        if m:
+            out.append(m.group(1).strip()[:500])
+    return out[:10]
+
+
+def _extract_thesis_from_markdown(md: str) -> str:
+    if not md:
+        return ""
+    m = re.search(r"\*\*Thesis:\*\*\s*(.+?)(?:\n|$)", md)
+    if m:
+        return m.group(1).strip()[:500]
+    return ""
+
+
 def _format_ts(seconds: Optional[float]) -> str:
     if seconds is None:
         return "??:??"
@@ -264,6 +370,16 @@ def summarize_transcript(
     final.setdefault('claims_to_verify', [])
     final.setdefault('glossary', [])
     final.setdefault('markdown', '')
+
+    if pv == "v2":
+        if not final.get("transferable_atoms"):
+            final["transferable_atoms"] = _extract_atoms_from_markdown(final.get("markdown", ""))
+        if not final.get("stack"):
+            final["stack"] = _extract_stack_from_markdown(final.get("markdown", ""))
+        if not final.get("open_questions"):
+            final["open_questions"] = _extract_open_questions_from_markdown(final.get("markdown", ""))
+        if not final.get("thesis"):
+            final["thesis"] = _extract_thesis_from_markdown(final.get("markdown", ""))
 
     key_points = [c.get('name', '') + ': ' + c.get('definition', '') for c in final['key_concepts']]
     timestamp_topics = [
