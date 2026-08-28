@@ -1,4 +1,6 @@
-You are synthesising the final structured extraction from many chunk-level extractions of a single video. This output is consumed by a downstream agent that scores it against a goals file and proposes actions. Optimise for the agent: preserve mechanisms, attach timestamps, dedupe across chunks.
+You are synthesising the final structured extraction from many chunk-level extractions of a single video. The output is consumed by a downstream agent that scores it against a goals file and proposes actions. Optimise for the agent: preserve mechanisms, attach timestamps, dedupe across chunks.
+
+CRITICAL: Output ONLY the JSON object below. Do NOT include v1 fields like tldr/argument/key_concepts/takeaways/claims_to_verify/glossary. Those are NOT in this schema. If you produce them, the downstream pipeline breaks.
 
 # Input
 
@@ -13,11 +15,7 @@ Chunk-level extractions (one JSON object per chunk, in order):
 Transcript (with line-mapped timestamps where available):
 {transcript_with_timestamps}
 
-# Task
-
-Produce a single JSON object matching the schema below. STRICT JSON, no commentary, no markdown fences.
-
-# Output schema
+# Output schema (THE ONLY fields allowed in your response)
 
 {{
   "meta": {{
@@ -43,14 +41,14 @@ Produce a single JSON object matching the schema below. STRICT JSON, no commenta
     {{"tool": "Name", "role": "what it does in the speaker's setup"}}
   ],
   "open_questions": [
-    "questions a viewer would naturally ask after this video, that the speaker did not fully answer"
+    "questions a thoughtful viewer would naturally ask after this video"
   ],
-  "markdown": "see layout below"
+  "markdown": "a human-readable rendering of the above structured fields (see layout below)"
 }}
 
 # Atom rules
 
-- Atoms are the priority output. Aim for 3-8 atoms per video. If a video has no reusable mechanisms, return an empty list — do NOT manufacture atoms from vague advice.
+- Atoms are the priority output. Aim for 3-8 atoms per video. If a video has no reusable mechanisms, return an EMPTY transferable_atoms list — do NOT manufacture atoms from vague advice.
 - Each atom must be referenceable: an agent picking it should know exactly what to look up in the transcript. If the mechanism can't be stated concretely with specifics, drop the atom.
 - IDs: atom_01, atom_02, atom_03, etc.
 - Type vocabulary (closed set): implementation_pattern, framework, org_pattern, business_model, revenue_pattern, architecture, tool_recipe, concept
@@ -69,41 +67,33 @@ Produce a single JSON object matching the schema below. STRICT JSON, no commenta
 - Things a thoughtful viewer would want to follow up on. NOT trivia. NOT things the speaker already answered.
 - 1-5 questions. Empty list if nothing worth flagging.
 
-# Markdown layout (human-readable summary)
+# Markdown layout (the LAST field — just a rendering of the atoms above)
+
+The markdown field is for human reading. It should mention each atom by ID + label, then any context the human needs. Format loosely:
 
 ```
 # {{title}}
 
-**Channel:** {{channel}} | **URL:** {{url}} | **Duration:** {{duration}}
+**Channel:** {{channel}} | **URL:** {{url}}
 
-## TL;DR
-<three sentences>
+**Thesis:** {{thesis}}
 
-## The Argument
-<2-4 sentences, or 'No single argument; this is a collection of tips.'>
+## Atoms
 
-## Key Concepts
-- **Concept** — definition _(at MM:SS)_
-- ...
+- `atom_01` — <label>: <one-line summary of the mechanism>
+- `atom_02` — <label>: ...
 
-## Actionable Takeaways
-### <category>
-- takeaway
-### <category>
-- takeaway
+## Stack
 
-## Claims to Verify
-- claim _(at MM:SS)_ — why this should be checked
+- <tool>: <role>
 
-## Glossary
-- **Entity** (type) — _first mentioned at MM:SS_
+## Open questions
 
-## Source
-Transcript analysed in {{n_chunks}} chunks. {{transcript_length}} characters.
+- <question>
 ```
 
-# General rules
+If transferable_atoms is empty, write a one-paragraph editorial summary instead.
 
-- Be precise. Don't editorialize. Don't invent. Drop vague takeaways — only concrete ones.
-- Deduplicate concepts/claims across chunks: a concept introduced in chunk 2 and referenced in chunk 5 should appear once, with timestamp from chunk 2.
-- Length budget for `markdown`: readable in 60 seconds. Tight.
+# Output
+
+STRICT JSON. No commentary. No markdown fences. Only the keys in the schema above. Response MUST parse with json.loads.
