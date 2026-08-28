@@ -353,7 +353,7 @@ Return STRICT JSON, no commentary, no markdown fences. A single array — one en
 
 # Rules
 
-- relevance_score must be 0, 1, 2, or 3 per the goal's scoring_rubric.
+- relevance_score must be 0, 1, 2, or 3 per the goal's scoring_rubric. This is the GOAL-LEVEL relevance, set ONCE per goal entry. Do NOT repeat or "echo" relevance_score inside each proposed_action — actions do not have their own relevance score.
 - If relevance_score < 2: proposed_actions MUST be empty and skip_reason MUST be non-null.
 - If relevance_score >= 2: applicable_atoms lists the atoms that drove the score; proposed_actions may be empty ONLY if no concrete action can be shaped from those atoms.
 - action_description: one paragraph, concrete, references the specific atoms and what changes.
@@ -362,10 +362,10 @@ Return STRICT JSON, no commentary, no markdown fences. A single array — one en
 - reversibility: must be one of: trivial, undo_able, hard, irreversible.
 - external_surface: boolean — does this touch anyone outside the operator?
 - dependencies: list of strings naming things outside the agent's control (tools, accounts, third-party services). Empty list if none.
-- impact_classification: "substantial" or "minor" if the action touches a live product the operator owns. Otherwise null.
-- pre_check: list of strings answering each pre-check question, or null if tier < 3.
+- impact_classification: "substantial" or "minor" if the action touches a live product the operator owns. Otherwise null. Be opinionated: when in doubt, pick "minor" for docs/internal changes, "substantial" for user-visible behavior changes.
+- pre_check: list of strings answering each pre-check question, or null if tier < 3. Required for tier_3 actions.
 - Atom types: implementation_pattern, framework, org_pattern, business_model, revenue_pattern, architecture, tool_recipe, concept.
-- Atom evidence: stated_practice, framework_claim, anecdotal, data.
+- Atom evidence: stated_practice (speaker describes doing it), framework_claim (speaker defines a taxonomy), anecdotal (one-off example), data (cited numbers). Use stated_practice ONLY when the speaker explicitly describes their own practice. For business models the speaker is *speculating about*, use anecdotal or framework_claim.
 
 Output ONLY the JSON array, no preamble.
 """
