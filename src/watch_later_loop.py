@@ -254,7 +254,25 @@ def sync_once(model: str = DEFAULT_MODEL, limit: int = 25) -> SyncRunReport:
             report.errors.append(f"{video_id}: stage2: {stage2_error}")
         stage2_payload = s2
 
-        emailed, email_error, message_id = _send_email(summary, stage2_payload=stage2_payload)
+        action_id_by_goal: dict[str, str] = {}
+        if stage2_payload and stage2_payload.get("per_goal"):
+            from src.policy import action_id as _make_aid
+            from src.stage2 import CURRENT_PROMPT_VERSION as _pv
+            for goal_entry in stage2_payload["per_goal"]:
+                gid = goal_entry.get("goal_id", "")
+                if not gid:
+                    continue
+                for action in goal_entry.get("proposed_actions", []) or []:
+                    desc = action.get("action_description", "")
+                    aid = _make_aid(video_id, gid, desc)
+                    if aid:
+                        action_id_by_goal[gid] = aid
+
+        emailed, email_error, message_id = _send_email(
+            summary,
+            stage2_payload=stage2_payload,
+            action_id_by_goal=action_id_by_goal,
+        )
         if emailed:
             db.mark_watch_later_emailed(video_id, message_id)
             report.emailed += 1

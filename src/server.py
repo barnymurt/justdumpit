@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src import db
+from src import db, gmail_sender
 from src.config import get_api_key, DEFAULT_MODEL, get_output_dir
 from src.registry import list_channels as registry_list_channels
 from src.search import semantic_search

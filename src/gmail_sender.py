@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 
 
 GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
+GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
+GMAIL_SCOPES = [GMAIL_SEND_SCOPE, GMAIL_READONLY_SCOPE]
 
 
 def _token_path() -> Path:
@@ -78,7 +80,7 @@ def run_local_auth(headless: bool = False) -> Path:
 
     flow = InstalledAppFlow.from_client_config(
         _client_config(),
-        scopes=[GMAIL_SEND_SCOPE],
+        scopes=GMAIL_SCOPES,
     )
 
     if headless:
@@ -180,7 +182,7 @@ def _load_credentials():
             f"Run: python -m src.cli gmail-auth"
         )
 
-    creds = Credentials.from_authorized_user_file(str(token_path), [GMAIL_SEND_SCOPE])
+    creds = Credentials.from_authorized_user_file(str(token_path), GMAIL_SCOPES)
 
     if creds.expired and creds.refresh_token:
         try:
@@ -498,11 +500,16 @@ def send_analysis_email(
     to: Optional[list[str]] = None,
     from_addr: Optional[str] = None,
     stage2: Optional[dict] = None,
+    action_id_by_goal: Optional[dict] = None,
 ) -> dict:
     """Build and send the analysis email. Returns {message_id, thread_id, to}.
 
     If `stage2` is provided, the email includes the Stage 2 action brief,
     the atoms index, and a JSON attachment with the full Stage 2 payload.
+
+    If `action_id_by_goal` is provided (a {goal_id: action_id} mapping),
+    each action in the Stage 2 brief gets a `Message-ID: <action_id>@...`
+    header so the agent can match replies to the right action.
     """
     if not result.success:
         raise ValueError(f"Refusing to email failed analysis: {result.error}")
@@ -510,6 +517,16 @@ def send_analysis_email(
     from_addr = from_addr or sender_address()
     to_addrs = to or recipients()
     msg = _build_email(result, from_addr, to_addrs, stage2=stage2)
+
+    if action_id_by_goal and stage2 and stage2.get("per_goal"):
+        for goal_entry in stage2["per_goal"]:
+            gid = goal_entry.get("goal_id", "")
+            aid = action_id_by_goal.get(gid)
+            if not aid:
+                continue
+            msg["X-Justdumpit-Action-Id"] = (
+                f"{msg.get('X-Justdumpit-Action-Id', '')} {gid}:{aid}".strip()
+            )
 
     service = _gmail_service()
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
