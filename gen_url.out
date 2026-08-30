@@ -1,0 +1,7 @@
+﻿================================================================================
+URL:
+https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=258147166506-6pp39dbdkmcgho90dltu092e22tq4s5m.apps.googleusercontent.com&redirect_uri=http%3A%2F%2F127.0.0.1%3A18099&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.readonly&state=IMEKGXPYpHrpYDhe52Od-Q&code_challenge=N810YcvWNUJmtqns2fBi34qiQQQSGDZnPuSlidgMq_I&code_challenge_method=S256&prompt=consent&access_type=offline&include_granted_scopes=true
+================================================================================
+CODE_VERIFIER (need this for exchange):
+v7Wz3-R4KA8yrBBQeNHEsUh0_IraU0F_oxW_3bLnvbCyG_eiqHs0NiSQiE4Cm8W_SpbOn8qWyF_SwwqmypLI_Q
+================================================================================

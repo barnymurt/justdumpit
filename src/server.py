@@ -433,3 +433,104 @@ def get_goals_endpoint():
         "atom_types": cfg.atom_types,
         "atom_evidence": cfg.atom_evidence,
     }
+
+
+
+@app.get("/gmail/inbox")
+def gmail_inbox_endpoint(limit: int = 20, since_minutes: int = 120):
+    """Return recent inbox messages (used by justdumpit-agent for reply parsing).
+
+    Requires the Gmail token to have the gmail.readonly scope.
+    """
+    try:
+        service = gmail_sender._gmail_service()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Gmail unavailable: {e}")
+
+    import datetime as _dt
+    after_epoch = int((_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(minutes=since_minutes)).timestamp())
+    query = f"in:inbox after:{after_epoch}"
+
+    try:
+        resp = service.users().messages().list(userId="me", q=query, maxResults=limit).execute()
+        message_ids = [m["id"] for m in resp.get("messages", []) or []]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gmail list failed: {e}")
+
+    out = []
+    for mid in message_ids:
+        try:
+            m = service.users().messages().get(userId="me", id=mid, format="full").execute()
+        except Exception:
+            continue
+        headers_list = m.get("payload", {}).get("headers", []) or []
+        headers = {h["name"].lower(): h["value"] for h in headers_list}
+        body = _extract_gmail_body(m.get("payload", {}) or {})
+        out.append({
+            "message_id": mid,
+            "thread_id": m.get("threadId"),
+            "from": headers.get("from", ""),
+            "to": headers.get("to", ""),
+            "subject": headers.get("subject", ""),
+            "date": headers.get("date", ""),
+            "in_reply_to": headers.get("in-reply-to", ""),
+            "x_justdumpit_action_id": headers.get("x-justdumpit-action-id", ""),
+            "body": body,
+        })
+    return {"messages": out, "count": len(out)}
+
+
+@app.post("/gmail/send-reply")
+def gmail_send_reply_endpoint(payload: dict):
+    """Send a reply email. Used by justdumpit-agent when confirming email decisions."""
+    to = payload.get("to")
+    subject = payload.get("subject", "")
+    body = payload.get("body", "")
+    in_reply_to = payload.get("in_reply_to")
+    thread_id = payload.get("thread_id")
+
+    if not to or not body:
+        raise HTTPException(status_code=400, detail="'to' and 'body' required")
+
+    import base64
+    from email.message import EmailMessage as _EM
+    from src.gmail_sender import sender_address
+
+    msg = _EM()
+    msg["From"] = sender_address()
+    msg["To"] = to
+    if subject:
+        msg["Subject"] = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+    if in_reply_to:
+        msg["In-Reply-To"] = in_reply_to
+    msg.set_content(body)
+
+    try:
+        service = gmail_sender._gmail_service()
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
+        kwargs = {"userId": "me", "body": {"raw": raw}}
+        if thread_id:
+            kwargs["body"]["threadId"] = thread_id
+        sent = service.users().messages().send(**kwargs).execute()
+        return {"message_id": sent.get("id"), "thread_id": sent.get("threadId")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gmail send failed: {e}")
+
+
+def _extract_gmail_body(payload: dict) -> str:
+    """Extract plain text body from a Gmail API message payload."""
+    import base64
+    if payload.get("body", {}).get("data"):
+        try:
+            return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    for part in payload.get("parts", []) or []:
+        mime = part.get("mimeType", "")
+        if mime == "text/plain":
+            return _extract_gmail_body(part)
+        if mime.startswith("multipart/"):
+            inner = _extract_gmail_body(part)
+            if inner:
+                return inner
+    return ""
