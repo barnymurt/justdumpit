@@ -14,8 +14,6 @@ log = logging.getLogger(__name__)
 
 
 YOUTUBE_SCOPES = [
-    "openid",
-    "email",
     "https://www.googleapis.com/auth/youtube",
 ]
 YOUTUBE_LOGIN_HINT = os.getenv("YOUTUBE_LOGIN_HINT", "").strip()
